@@ -1289,7 +1289,7 @@
             openModal();
         }
 
-        function saveSiswa() {
+        async function saveSiswa() {
             const nisn = document.getElementById('mSiswaNisn').value;
             const nama = document.getElementById('mSiswaNama').value;
             const kelas = document.getElementById('mSiswaKelas').value.trim();
@@ -1305,16 +1305,20 @@
             } else {
                 db.siswa.push({ id: 'S' + Date.now(), nisn, nama, kelas, ta, jk, ortu });
             }
-            saveDb('siswa'); closeModal(); notifySuccess('Data siswa berhasil disimpan!'); renderModuleContent('siswa');
+            const ok = await saveDb('siswa');
+            if (!ok) return;
+            closeModal(); notifySuccess('Data siswa berhasil disimpan!'); renderModuleContent('siswa');
         }
 
         function editSiswa(id) { const item = db.siswa.find(s => s.id === id); if (item) openModalSiswa(item); }
         function deleteSiswa(id) {
             Swal.fire({ title: 'Hapus Siswa?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' })
-            .then((res) => {
-                if (res.isConfirmed) {
-                    db.siswa = db.siswa.filter(s => s.id !== id); saveDb('siswa'); validateFiltersSiswa(); notifySuccess('Data siswa dihapus!'); renderModuleContent('siswa');
-                }
+            .then(async (res) => {
+                if (!res.isConfirmed) return;
+                const ok = await deleteDbRecord('siswa', id);
+                if (!ok) return;
+                db.siswa = db.siswa.filter(s => s.id !== id);
+                validateFiltersSiswa(); notifySuccess('Data siswa dihapus!'); renderModuleContent('siswa');
             });
         }
 
@@ -1342,9 +1346,17 @@
             const idsToDelete = Array.from(checkedBoxes).map(cb => cb.value);
             if (idsToDelete.length === 0) return;
             Swal.fire({ title: `Hapus ${idsToDelete.length} Siswa Terpilih?`, text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus Semua!', cancelButtonText: 'Cancel' })
-            .then((res) => {
+            .then(async (res) => {
                 if (res.isConfirmed) {
-                    db.siswa = db.siswa.filter(s => !idsToDelete.includes(s.id)); saveDb('siswa'); validateFiltersSiswa(); notifySuccess(`${idsToDelete.length} siswa berhasil dihapus!`); renderModuleContent('siswa');
+                    let deleted = 0;
+                    for (const id of idsToDelete) {
+                        const ok = await deleteDbRecord('siswa', id);
+                        if (ok) deleted++;
+                    }
+                    if (deleted) {
+                        db.siswa = db.siswa.filter(s => !idsToDelete.includes(s.id));
+                        validateFiltersSiswa(); notifySuccess(`${deleted} siswa berhasil dihapus!`); renderModuleContent('siswa');
+                    }
                 }
             });
         }

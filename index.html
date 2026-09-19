@@ -3525,34 +3525,56 @@
         }
 
         async function savePengaturan() {
-            db.pengaturan.sekolah = document.getElementById('setSekolah').value;
-            db.pengaturan.alamat = document.getElementById('setAlamat').value;
-            db.pengaturan.kepsek = document.getElementById('setKepsek').value;
-            db.pengaturan.nipKepsek = document.getElementById('setNipKepsek').value;
-            db.pengaturan.bobotTugas = parseFloat(document.getElementById('setBobotTugas').value) || 20;
-            db.pengaturan.bobotUH = parseFloat(document.getElementById('setBobotUH').value) || 30;
-            db.pengaturan.bobotUTS = parseFloat(document.getElementById('setBobotUTS').value) || 20;
-            db.pengaturan.bobotUAS = parseFloat(document.getElementById('setBobotUAS').value) || 30;
-            if (tempSchoolLogo) db.pengaturan.logo = tempSchoolLogo;
+            const settings = {
+                sekolah: document.getElementById('setSekolah')?.value || '',
+                alamat: document.getElementById('setAlamat')?.value || '',
+                kepsek: document.getElementById('setKepsek')?.value || '',
+                nipKepsek: document.getElementById('setNipKepsek')?.value || '',
+                bobotTugas: parseFloat(document.getElementById('setBobotTugas')?.value) || 20,
+                bobotUH: parseFloat(document.getElementById('setBobotUH')?.value) || 30,
+                bobotUTS: parseFloat(document.getElementById('setBobotUTS')?.value) || 20,
+                bobotUAS: parseFloat(document.getElementById('setBobotUAS')?.value) || 30
+            };
+
+            if (tempSchoolLogo) settings.logo = tempSchoolLogo;
+            else if (db.pengaturan?.logo) settings.logo = db.pengaturan.logo;
 
             try {
                 if (currentUser && (currentUser.role === 'Admin Sistem' || currentUser.role === 'Guru Mapel')) {
                     const profile = {
-                        nama: document.getElementById('setUserName').value.trim(),
-                        nip: document.getElementById('setUserNip').value.trim(),
+                        nama: document.getElementById('setUserName')?.value.trim() || '',
+                        nip: document.getElementById('setUserNip')?.value.trim() || '',
                         foto: tempTeacherPhoto || currentUser.foto || ''
                     };
+
                     if (!profile.nama) return notifyError('Nama tidak boleh kosong!');
+
                     const result = await gasRequest('profile', { data: profile });
                     currentUser = result.user;
-                    try { sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser)); } catch (e) {}
+
+                    try {
+                        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser));
+                    } catch (e) {}
                 }
+
                 if (currentUser && currentUser.role === 'Admin Sistem') {
-                    await saveDb('pengaturan');
+                    await gasRequest('settings', { data: settings });
+                    db.pengaturan = { ...(db.pengaturan || {}), ...settings };
                 }
-                tempSchoolLogo = null; tempTeacherPhoto = null;
-                updateHeaderUI(); notifySuccess(currentUser && currentUser.role === 'Admin Sistem' ? 'Pengaturan sistem berhasil diperbarui!' : 'Profil berhasil diperbarui!');
-            } catch (error) { notifyError(error.message); }
+
+                tempSchoolLogo = null;
+                tempTeacherPhoto = null;
+                updateHeaderUI();
+
+                notifySuccess(
+                    currentUser && currentUser.role === 'Admin Sistem'
+                        ? 'Pengaturan sistem dan profil berhasil diperbarui!'
+                        : 'Profil berhasil diperbarui!'
+                );
+            } catch (error) {
+                console.error('[Save Pengaturan]', error);
+                notifyError(error.message || 'Gagal menyimpan pengaturan.');
+            }
         }
 
         function updateAdminUserSearch(val) {

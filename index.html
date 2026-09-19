@@ -496,6 +496,8 @@
         let currentAdminRoleFilter = '';
         let currentAdminUserSearch = '';
         let currentUser = null;
+        const moduleLoadedSignatures = {};
+        const moduleSnapshots = {};
         let currentLoginRole = 'Guru';
         let tempStudentUploadedPhoto = null;
         let tempSchoolLogo = null;
@@ -568,9 +570,46 @@
         }
 
         async function refreshServerData() {
-            const result = await gasRequest('data');
+            const result = await gasRequest('bootstrap');
             applyServerData(result.data);
+            snapshotModule('siswa');
+            snapshotModule('mapel');
+            snapshotModule('jadwal');
             return result.data;
+        }
+
+        function makeModuleSignature(key, filters) {
+            return key + '|' + JSON.stringify({
+                ta: filters && filters.ta || '',
+                kelas: filters && filters.kelas || '',
+                mapel: filters && filters.mapel || ''
+            });
+        }
+
+        function snapshotModule(key) {
+            try {
+                moduleSnapshots[key] = JSON.parse(JSON.stringify(db[key]));
+            } catch (e) {
+                moduleSnapshots[key] = Array.isArray(db[key]) ? db[key].slice() : {};
+            }
+        }
+
+        async function loadModuleData(key, filters = {}) {
+            const result = await gasRequest('module', { module: key, filters });
+            applyServerData(result.data);
+            Object.keys(result.data || {}).forEach(k => {
+                if (k in db) {
+                    moduleLoadedSignatures[k] = makeModuleSignature(k, filters);
+                    snapshotModule(k);
+                }
+            });
+            return result.data;
+        }
+
+        async function ensureModuleData(key, filters = {}, force = false) {
+            const signature = makeModuleSignature(key, filters);
+            if (!force && moduleLoadedSignatures[key] === signature) return;
+            await loadModuleData(key, filters);
         }
 
         async function initializeApp() {
@@ -624,27 +663,52 @@
 
         async function saveDb(key) {
             if (!GAS_API_URL) {
-                return notifyError('Backend GAS belum terhubung. Isi GAS_API_URL terlebih dahulu.');
+                notifyError('Backend GAS belum terhubung. Isi GAS_API_URL terlebih dahulu.');
+                return false;
             }
+
             try {
-                const result = await gasRequest('save', { key, data: db[key] });
+                const current = db[key];
+                const previous = moduleSnapshots[key];
+
+                if (!Array.isArray(current)) {
+                    const result = await gasRequest('save', { key, data: current, deletedIds: [] });
+                    if (result.data) applyServerData(result.data);
+                    snapshotModule(key);
+                    return true;
+                }
+
+                const oldMap = new Map(
+                    (Array.isArray(previous) ? previous : []).map(x => [String(x.id), x])
+                );
+                const newMap = new Map(current.map(x => [String(x.id), x]));
+                const changed = [];
+
+                current.forEach(item => {
+                    const oldItem = oldMap.get(String(item.id));
+                    if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(item)) changed.push(item);
+                });
+
+                const deletedIds = [];
+                oldMap.forEach((_, id) => {
+                    if (!newMap.has(id)) deletedIds.push(id);
+                });
+
+                if (!changed.length && !deletedIds.length) return true;
+
+                const result = await gasRequest('save', {
+                    key,
+                    data: changed,
+                    deletedIds
+                });
+
                 if (result.data) applyServerData(result.data);
+                snapshotModule(key);
                 return true;
             } catch (error) {
                 console.error('[Secure Save]', error);
                 notifyError(error.message);
-                try { await refreshServerData(); } catch (e) {}
-                return false;
-            }
-        }
-
-        async function deleteDbRecord(key, id) {
-            try {
-                const result = await gasRequest('delete', { key, id });
-                try { await refreshServerData(); } catch (e) { if (result.data) applyServerData(result.data); }
-                return true;
-            } catch (error) {
-                notifyError(error.message);
+                try { await loadModuleData(key, getActiveGlobalFilter(), true); } catch (e) {}
                 return false;
             }
         }
@@ -835,7 +899,11 @@
             try { sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user)); } catch (e) { }
             checkAuth();
             notifySuccess(`Selamat datang, ${user.nama}!`);
-            try { await refreshServerData(); renderModuleContent(currentActiveModule); } catch (e) { console.error(e); }
+            try {
+                await refreshServerData();
+                await ensureModuleData(currentActiveModule, getActiveGlobalFilter(), true);
+                renderModuleContent(currentActiveModule);
+            } catch (e) { console.error(e); }
         }
 
         async function handleUnifiedLogin(e) {
@@ -970,7 +1038,7 @@
         function updateLocalFilter(type, value) {
             if (type === 'ta') { activeTA = value; activeSiswaTAFilter = value; }
             if (type === 'mapel') activeMapelValue = value;
-            renderModuleContent(currentActiveModule);
+            switchModule(currentActiveModule);
         }
 
         function updateSiswaKelasFilter(val) {
@@ -1008,7 +1076,7 @@
             }
         });
 
-        function switchModule(modKey) {
+        async function switchModule(modKey) {
             currentActiveModule = modKey;
             try { localStorage.setItem('siags_activeModule', modKey); } catch (e) { }
 
@@ -1019,7 +1087,35 @@
             const sidebar = document.getElementById('sidebar');
             if (window.innerWidth < 1024 && !sidebar.classList.contains('-translate-x-full')) sidebar.classList.add('-translate-x-full');
 
-            renderModuleContent(modKey);
+            const container = document.getElementById('moduleContentContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-brand-500 mb-3"></i>
+                        <div class="text-sm font-semibold">Memuat ${modKey}...</div>
+                        <div class="text-[11px] mt-1">Mengambil data yang diperlukan saja</div>
+                    </div>
+                `;
+            }
+
+            try {
+                const filter = getActiveGlobalFilter();
+                await ensureModuleData(modKey, filter);
+                renderModuleContent(modKey);
+            } catch (error) {
+                console.error('[Lazy Module]', error);
+                if (container) {
+                    container.innerHTML = `
+                        <div class="m-4 p-5 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700">
+                            <div class="font-bold text-sm mb-1">Gagal memuat modul</div>
+                            <div class="text-xs">${error.message || 'Terjadi kesalahan saat mengambil data.'}</div>
+                            <button onclick="switchModule('${modKey}')" class="mt-3 px-3 py-2 bg-rose-600 text-white rounded-lg text-xs font-semibold">
+                                Coba Lagi
+                            </button>
+                        </div>
+                    `;
+                }
+            }
         }
 
         function renderModuleContent(modKey) {
@@ -1040,7 +1136,7 @@
                 case 'tugas': renderTugasView(container, filter); break;
                 case 'catatan': renderCatatanView(container, filter); break;
                 case 'piket': renderPiketView(container); break;
-                case 'refleksi': renderRefleksiView(container); break;
+                case 'refleksi': renderRefleksiView(container, filter); break;
                 case 'inventaris': renderInventarisView(container); break;
                 case 'rapor': renderRaporView(container, filter); break;
                 case 'pengaturan': renderPengaturanView(container); break;
@@ -2327,7 +2423,7 @@
                                     <p class="text-xs text-slate-500 mt-1">${t.deskripsi}</p>
                                     <div class="text-[11px] text-rose-600 font-semibold mt-3 flex items-center gap-1"><i class="fa-regular fa-clock"></i> Deadline: ${t.deadline}</div>
                                 </div>
-                                ${!isSiswa ? `<div class="mt-4 pt-3 border-t flex justify-end"><button onclick="deleteTugas('${t.id}')" class="text-xs text-rose-600 hover:bg-rose-50 px-3 py-1 rounded-lg">Hapus Tugas</button></div>` : ''}
+                                ${!isSiswa ? `<div class="mt-4 pt-3 border-t flex justify-end gap-2"><button onclick="openModalTugas(${JSON.stringify(t).replace(/"/g, '&quot;')})" class="text-xs text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-lg"><i class="fa-solid fa-pen-to-square"></i> Edit</button><button onclick="deleteTugas('${t.id}')" class="text-xs text-rose-600 hover:bg-rose-50 px-3 py-1 rounded-lg"><i class="fa-solid fa-trash"></i> Hapus</button></div>` : ''}
                             </div>
                         `).join('')}
                     </div>
@@ -2335,59 +2431,62 @@
             `;
         }
 
-        function openModalTugas() {
+        function openModalTugas(data = null) {
+            currentEditingId = data ? data.id : null;
             const activeFilter = getActiveGlobalFilter();
-            
             const uniqueMapels = [...new Set(db.mapel.map(m => m.nama))].filter(Boolean).sort();
-            const mapelOptions = uniqueMapels.length > 0 
-                ? uniqueMapels.map(mName => `<option value="${mName}" ${activeFilter.mapel === mName ? 'selected' : ''}>${mName}</option>`).join('')
+            const mapelOptions = uniqueMapels.length > 0
+                ? uniqueMapels.map(mName => `<option value="${mName}" ${(data ? data.mapel : activeFilter.mapel) === mName ? 'selected' : ''}>${mName}</option>`).join('')
                 : '<option value="">(Belum Ada Mapel)</option>';
-
             const uniqueClasses = [...new Set(db.siswa.map(s => s.kelas))].filter(Boolean).sort();
-            const kelasOptions = uniqueClasses.length > 0 
-                ? uniqueClasses.map(c => `<option value="${c}" ${activeFilter.kelas === c ? 'selected' : ''}>${c}</option>`).join('')
+            const kelasOptions = uniqueClasses.length > 0
+                ? uniqueClasses.map(c => `<option value="${c}" ${(data ? data.kelas : activeFilter.kelas) === c ? 'selected' : ''}>${c}</option>`).join('')
                 : '<option value="">(Belum Ada Kelas)</option>';
 
-            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-list-check"></i> Tambah Tugas Baru`;
+            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-list-check"></i> ${data ? 'Edit Tugas' : 'Tambah Tugas Baru'}`;
             document.getElementById('modalBody').innerHTML = `
                 <div id="formTugas" class="space-y-3">
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="sm:col-span-1"><label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Tenggat (Deadline)</label><input type="date" id="mTugasDeadline" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></div>
-                        <div class="sm:col-span-2"><label class="block text-xs font-semibold text-slate-600 mb-1">Judul Tugas</label><input type="text" id="mTugasJudul" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></div>
+                        <div class="sm:col-span-1"><label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Tenggat (Deadline)</label><input type="date" id="mTugasDeadline" value="${data ? data.deadline : ''}" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></div>
+                        <div class="sm:col-span-2"><label class="block text-xs font-semibold text-slate-600 mb-1">Judul Tugas</label><input type="text" id="mTugasJudul" value="${data ? String(data.judul || '').replace(/"/g, '&quot;') : ''}" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Mata Pelajaran</label>
-                            <select id="mTugasMapel" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none cursor-pointer focus:ring-2 focus:ring-brand-500 transition shadow-sm bg-slate-50">
-                                ${mapelOptions}
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Kelas</label>
-                            <select id="mTugasKelas" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none cursor-pointer focus:ring-2 focus:ring-brand-500 transition shadow-sm bg-slate-50">
-                                ${kelasOptions}
-                            </select>
-                        </div>
+                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Mata Pelajaran</label><select id="mTugasMapel" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none cursor-pointer focus:ring-2 focus:ring-brand-500 transition shadow-sm bg-slate-50">${mapelOptions}</select></div>
+                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Kelas</label><select id="mTugasKelas" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none cursor-pointer focus:ring-2 focus:ring-brand-500 transition shadow-sm bg-slate-50">${kelasOptions}</select></div>
                     </div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Deskripsi / Instruksi</label><textarea id="mTugasDesk" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></textarea></div>
-                </div>
-            `;
+                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Deskripsi / Instruksi</label><textarea id="mTugasDesk" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">${data ? (data.deskripsi || '') : ''}</textarea></div>
+                </div>`;
             openModal();
         }
 
-        function saveTugas() {
-            const judul = document.getElementById('mTugasJudul').value, deskripsi = document.getElementById('mTugasDesk').value, deadline = document.getElementById('mTugasDeadline').value;
+        async function saveTugas() {
+            const judul = document.getElementById('mTugasJudul').value.trim();
+            const deskripsi = document.getElementById('mTugasDesk').value.trim();
+            const deadline = document.getElementById('mTugasDeadline').value;
             const mapel = document.getElementById('mTugasMapel').value;
             const kelas = document.getElementById('mTugasKelas').value;
-            
             if (!judul || !deadline) return notifyError('Harap isi judul dan tanggal deadline!');
             if (!mapel) return notifyError('Harap pilih Mata Pelajaran!');
             if (!kelas) return notifyError('Harap pilih Kelas!');
-            
+
             const filter = getActiveGlobalFilter();
-            db.tugas.push({ id: 'T' + Date.now(), judul, deskripsi, deadline, mapel: mapel.trim(), kelas: kelas.trim(), ta: filter.ta, status: 'Aktif' });
-            saveDb('tugas'); closeModal(); notifySuccess('Tugas berhasil dibuat!'); renderModuleContent('tugas');
+            if (currentEditingId) {
+                const item = db.tugas.find(t => t.id === currentEditingId);
+                if (!item) return notifyError('Data tugas tidak ditemukan. Silakan muat ulang halaman.');
+                item.judul = judul; item.deskripsi = deskripsi; item.deadline = deadline;
+                item.mapel = mapel.trim(); item.kelas = kelas.trim(); item.ta = item.ta || filter.ta; item.status = item.status || 'Aktif';
+            } else {
+                db.tugas.push({ id: 'T' + Date.now(), judul, deskripsi, deadline, mapel: mapel.trim(), kelas: kelas.trim(), ta: filter.ta, status: 'Aktif' });
+            }
+
+            const ok = await saveDb('tugas');
+            if (!ok) return;
+            currentEditingId = null;
+            closeModal();
+            notifySuccess('Tugas berhasil disimpan!');
+            renderModuleContent('tugas');
         }
+
         function deleteTugas(id) {
             Swal.fire({ title: 'Hapus Tugas?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' })
             .then((res) => {
@@ -2491,23 +2590,21 @@
             `;
             openModal();
         }
-        function saveCatatan() {
+        async function saveCatatan() {
             const tanggal = document.getElementById('mCatTgl').value;
             const kelas = document.getElementById('mCatKelas').value;
             const siswaRaw = document.getElementById('mCatSiswa').value;
-            const kasus = document.getElementById('mCatKasus').value;
-            const tindakLanjut = document.getElementById('mCatLanjut').value;
-            
-            if(!siswaRaw) return notifyError('Pilih siswa terlebih dahulu!');
-            if(!kasus) return notifyError('Isi kasus/catatan terlebih dahulu!');
-            
+            const kasus = document.getElementById('mCatKasus').value.trim();
+            const tindakLanjut = document.getElementById('mCatLanjut').value.trim();
+            if (!siswaRaw) return notifyError('Pilih siswa terlebih dahulu!');
+            if (!kasus) return notifyError('Isi kasus/catatan terlebih dahulu!');
             const filter = getActiveGlobalFilter();
             const siswaFinal = `${siswaRaw} (${kelas})`;
-            
-            db.catatan.push({ id: 'C' + Date.now(), tanggal, siswa: siswaFinal, kelas: kelas, ta: filter.ta, kasus, tindakLanjut }); 
-            saveDb('catatan'); 
-            closeModal(); 
-            notifySuccess('Catatan tersimpan!'); 
+            db.catatan.push({ id: 'C' + Date.now(), tanggal, siswa: siswaFinal, kelas: kelas, ta: filter.ta, kasus, tindakLanjut });
+            const ok = await saveDb('catatan');
+            if (!ok) return;
+            closeModal();
+            notifySuccess('Catatan konseling tersimpan!');
             renderModuleContent('catatan');
         }
         function deleteCatatan(id) {
@@ -2692,7 +2789,7 @@
 
         // ==========================================
         // MODUL REFLEKSI & MOTIVASI
-        function renderRefleksiView(container, filter) { 
+        function renderRefleksiView(container, filter = getActiveGlobalFilter()) { 
             const list = db.refleksi.filter(r => (!filter.mapel || r.mapel === filter.mapel) && (!filter.kelas || r.kelas === filter.kelas) && (!filter.ta || r.ta === filter.ta));
             container.innerHTML = `
                 <div class="space-y-4 animate-fade-in">
@@ -2764,30 +2861,21 @@
             `;
             openModal();
         }
-        function saveRefleksi() {
+        async function saveRefleksi() {
             const tanggal = document.getElementById('mRefTgl').value;
-            const judul = document.getElementById('mRefJudul').value;
-            const isi = document.getElementById('mRefIsi').value;
+            const judul = document.getElementById('mRefJudul').value.trim();
+            const isi = document.getElementById('mRefIsi').value.trim();
             const mapel = document.getElementById('mRefMapel').value;
             const kelas = document.getElementById('mRefKelas').value;
-            
-            if(!judul || !isi) return notifyError('Lengkapi form terlebih dahulu!');
-            if(!mapel) return notifyError('Harap pilih Mata Pelajaran!');
-            if(!kelas) return notifyError('Harap pilih Kelas!');
-            
+            if (!judul || !isi) return notifyError('Lengkapi form terlebih dahulu!');
+            if (!mapel) return notifyError('Harap pilih Mata Pelajaran!');
+            if (!kelas) return notifyError('Harap pilih Kelas!');
             const filter = getActiveGlobalFilter();
-            db.refleksi.push({
-                id: 'R' + Date.now(), 
-                tanggal, 
-                judul, 
-                isi,
-                mapel: mapel.trim(),
-                kelas: kelas.trim(),
-                ta: filter.ta
-            }); 
-            saveDb('refleksi'); 
-            closeModal(); 
-            notifySuccess('Refleksi disimpan!'); 
+            db.refleksi.push({ id: 'R' + Date.now(), tanggal, judul, isi, mapel: mapel.trim(), kelas: kelas.trim(), ta: filter.ta });
+            const ok = await saveDb('refleksi');
+            if (!ok) return;
+            closeModal();
+            notifySuccess('Refleksi & motivasi disimpan!');
             renderModuleContent('refleksi');
         }
         function deleteRefleksi(id) {
@@ -2860,10 +2948,17 @@
             `;
             openModal();
         }
-        function saveInventaris() {
-            const nama = document.getElementById('mInvNama').value, jumlah = document.getElementById('mInvJml').value, kondisi = document.getElementById('mInvKon').value;
-            if(!nama) return notifyError('Nama barang wajib diisi!');
-            db.inventaris.push({id: 'I' + Date.now(), nama, jumlah, kondisi}); saveDb('inventaris'); closeModal(); notifySuccess('Barang ditambahkan ke inventaris!'); renderModuleContent('inventaris');
+        async function saveInventaris() {
+            const nama = document.getElementById('mInvNama').value.trim();
+            const jumlah = document.getElementById('mInvJml').value;
+            const kondisi = document.getElementById('mInvKon').value;
+            if (!nama) return notifyError('Nama barang wajib diisi!');
+            db.inventaris.push({ id: 'I' + Date.now(), nama, jumlah, kondisi });
+            const ok = await saveDb('inventaris');
+            if (!ok) return;
+            closeModal();
+            notifySuccess('Barang ditambahkan ke inventaris!');
+            renderModuleContent('inventaris');
         }
         function deleteInventaris(id) {
             Swal.fire({ title: 'Hapus Barang Inventaris?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' })
@@ -3064,7 +3159,9 @@
             Swal.fire({
                 title: 'Pratinjau Dokumen Rapor', width: '90%',
                 html: `
-                    <div id="lembarRaporPrint" class="p-8 bg-white text-slate-900 font-serif text-[11px] leading-relaxed mx-auto max-w-[210mm] min-h-[297mm] shadow-sm border text-left">
+                    <div id="raporPreviewViewport" style="width:100%; overflow:hidden; background:#e5e7eb; padding:8px 0; text-align:center;">
+                        <div id="lembarRaporScale" style="display:inline-block; width:794px; transform-origin:top center; text-align:left;">
+                        <div id="lembarRaporPrint" style="box-sizing:border-box; width:794px; min-width:794px; min-height:1123px; padding:30px; background:#fff; color:#0f172a; font-family:Georgia, 'Times New Roman', serif; font-size:11px; line-height:1.6; box-shadow:0 1px 4px rgba(0,0,0,.12); border:1px solid #e5e7eb; text-align:left; overflow:hidden;">
                         
                         <!-- KOP SEKOLAH -->
                         <div class="flex items-center justify-between border-b-4 border-slate-900 pb-4 mb-6">
@@ -3147,11 +3244,26 @@
                             </div>
                         </div>
                     </div>
+                    </div>
+                    </div>
                 `,
                 confirmButtonText: '<i class="fa-solid fa-file-pdf"></i> Unduh / Cetak PDF', 
                 confirmButtonColor: '#2563eb', 
                 showCancelButton: true, 
-                cancelButtonText: 'Tutup'
+                cancelButtonText: 'Tutup',
+                didOpen: () => {
+                    const viewport = document.getElementById('raporPreviewViewport');
+                    const scaleBox = document.getElementById('lembarRaporScale');
+                    const paper = document.getElementById('lembarRaporPrint');
+                    if (viewport && scaleBox && paper) {
+                        const available = Math.max(280, viewport.clientWidth - 16);
+                        const scale = Math.min(1, available / 794);
+                        scaleBox.style.transform = `scale(${scale})`;
+                        scaleBox.style.height = `${1123 * scale}px`;
+                        viewport.style.height = `${1123 * scale + 16}px`;
+                        paper.style.minHeight = '1123px';
+                    }
+                }
             }).then((res) => {
                 if (res.isConfirmed) {
                     const el = document.getElementById('lembarRaporPrint');
@@ -3537,7 +3649,7 @@ function doPost(e) {
             document.getElementById('globalModal').classList.add('hidden');
         }
 
-        function submitModalForm() {
+        async function submitModalForm() {
             if (document.getElementById('formSiswa')) saveSiswa();
             else if (document.getElementById('formJadwal')) saveJadwal();
             else if (document.getElementById('formMapel')) saveMapel();

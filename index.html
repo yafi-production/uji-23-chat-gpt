@@ -545,18 +545,60 @@
             const requestBody = JSON.stringify(body);
             const requestKB = Math.round(new Blob([requestBody]).size / 1024);
             if (requestKB > 1500) throw new Error(`Data terlalu besar (${requestKB} KB). Gambar sudah diperkecil, tetapi masih terlalu besar.`);
+
             let response;
             try {
-                response = await fetch(GAS_API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:requestBody });
+                response = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: requestBody,
+                    redirect: 'follow',
+                    cache: 'no-store'
+                });
             } catch (e) {
-                console.error('[GAS Fetch]', e);
-                throw new Error('Koneksi ke Google Apps Script gagal. Pastikan Web App sudah di-deploy sebagai versi terbaru dan URL GAS benar.');
+                console.error('[GAS Fetch]', { action, url: GAS_API_URL, error: e });
+                throw new Error(`Koneksi GAS gagal saat menjalankan \"${action}\". Ini biasanya disebabkan Web App belum dapat diakses publik, deployment masih versi lama, URL /exec tidak sesuai, atau browser memblokir redirect/CORS.`);
             }
+
+            const raw = await response.text();
+            if (!response.ok) {
+                console.error('[GAS HTTP]', response.status, raw.slice(0, 500));
+                throw new Error(`Google Apps Script mengembalikan HTTP ${response.status} pada action \"${action}\".`);
+            }
+
             let result;
-            try { result = await response.json(); }
-            catch (e) { throw new Error(`Respons Google Apps Script tidak valid (HTTP ${response.status}).`); }
-            if (!result || result.ok === false) throw new Error(result && result.error ? result.error : 'Server tidak merespons dengan benar.');
+            try { result = JSON.parse(raw); }
+            catch (e) {
+                console.error('[GAS Non-JSON]', raw.slice(0, 1000));
+                if (/accounts\.google\.com|ServiceLogin|Sign in/i.test(raw)) {
+                    throw new Error('Web App GAS meminta login Google. Ubah akses deployment menjadi \"Anyone\" lalu deploy versi baru.');
+                }
+                throw new Error(`Respons GAS bukan JSON pada action \"${action}\". Pastikan URL yang dipakai adalah URL Web App berakhiran /exec.`);
+            }
+            if (!result || result.ok === false) {
+                throw new Error(result && result.error ? result.error : `Server menolak action \"${action}\".`);
+            }
             return result;
+        }
+
+        async function testGasConnection() {
+            try {
+                if (!GAS_API_URL) throw new Error('URL Web App GAS belum diatur.');
+                const url = GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + 'action=health&_=' + Date.now();
+                const response = await fetch(url, { method:'GET', redirect:'follow', cache:'no-store' });
+                const raw = await response.text();
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                let data;
+                try { data = JSON.parse(raw); } catch (_) {
+                    if (/accounts\.google\.com|ServiceLogin|Sign in/i.test(raw)) throw new Error('Web App meminta login Google.');
+                    throw new Error('Respons bukan JSON.');
+                }
+                if (!data.ok) throw new Error(data.error || 'Health check gagal.');
+                return data;
+            } catch (e) {
+                console.error('[GAS Health]', e);
+                throw new Error(`Tes koneksi GAS gagal: ${e.message}`);
+            }
         }
 
         function applyServerData(serverData) {
@@ -3581,26 +3623,34 @@
             else if (db.pengaturan?.logo) settings.logo = db.pengaturan.logo;
 
             try {
+                // Tes endpoint terlebih dahulu supaya error deployment tidak tertukar dengan error data.
+                await testGasConnection();
+
                 if (currentUser && (currentUser.role === 'Admin Sistem' || currentUser.role === 'Guru Mapel')) {
                     const profile = {
                         nama: document.getElementById('setUserName')?.value.trim() || '',
                         nip: document.getElementById('setUserNip')?.value.trim() || '',
-                        foto: tempTeacherPhoto || currentUser.foto || ''
+                        foto: tempTeacherPhoto !== null ? tempTeacherPhoto : (currentUser.foto || '')
                     };
 
                     if (!profile.nama) return notifyError('Nama tidak boleh kosong!');
 
-                    const result = await gasRequest('profile', { data: profile });
-                    currentUser = result.user;
-
                     try {
-                        sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser));
-                    } catch (e) {}
+                        const result = await gasRequest('profile', { data: profile });
+                        currentUser = result.user;
+                        try { sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser)); } catch (e) {}
+                    } catch (e) {
+                        throw new Error('Gagal menyimpan Profil Pengguna: ' + e.message);
+                    }
                 }
 
                 if (currentUser && currentUser.role === 'Admin Sistem') {
-                    await gasRequest('settings', { data: settings });
-                    db.pengaturan = { ...(db.pengaturan || {}), ...settings };
+                    try {
+                        await gasRequest('settings', { data: settings });
+                        db.pengaturan = { ...(db.pengaturan || {}), ...settings };
+                    } catch (e) {
+                        throw new Error('Gagal menyimpan Profil Sekolah/Pengaturan Sistem: ' + e.message);
+                    }
                 }
 
                 tempSchoolLogo = null;

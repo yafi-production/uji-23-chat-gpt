@@ -1099,8 +1099,10 @@
             }
 
             try {
-                const filter = getActiveGlobalFilter();
-                await ensureModuleData(modKey, filter);
+                const filter = modKey === 'rapor'
+                    ? { ta: activeRaporTAFilter || '', kelas: activeRaporKelasFilter || '', mapel: '' }
+                    : getActiveGlobalFilter();
+                await ensureModuleData(modKey, filter, modKey === 'rapor');
                 renderModuleContent(modKey);
             } catch (error) {
                 console.error('[Lazy Module]', error);
@@ -2524,8 +2526,9 @@
                                         <p class="text-xs text-emerald-600"><strong>Tindak Lanjut:</strong> ${c.tindakLanjut || '-'}</p>
                                     </div>
                                 </div>
-                                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                                    <button onclick="deleteCatatan('${c.id}')" class="text-xs font-semibold text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition">Hapus Catatan</button>
+                                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
+                                    <button onclick="editCatatan('${c.id}')" class="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                                    <button onclick="deleteCatatan('${c.id}')" class="text-xs font-semibold text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5"><i class="fa-solid fa-trash-can"></i> Hapus</button>
                                 </div>
                             </div>
                         `).join('')}
@@ -2547,28 +2550,29 @@
             }
         }
 
-        function openModalCatatan() {
+        function openModalCatatan(data = null) {
+            currentEditingId = data ? data.id : null;
             const activeFilter = getActiveGlobalFilter();
             const uniqueClasses = [...new Set(db.siswa.map(s => s.kelas))].filter(Boolean).sort();
-            
-            let initialKelas = activeFilter.kelas || (uniqueClasses.length > 0 ? uniqueClasses[0] : '');
-            if(!uniqueClasses.includes(initialKelas) && uniqueClasses.length > 0) initialKelas = uniqueClasses[0];
+            let initialKelas = data?.kelas || activeFilter.kelas || (uniqueClasses.length > 0 ? uniqueClasses[0] : '');
+            if (!uniqueClasses.includes(initialKelas) && uniqueClasses.length > 0) initialKelas = uniqueClasses[0];
 
-            let kelasOptions = uniqueClasses.length > 0 
+            const kelasOptions = uniqueClasses.length > 0
                 ? uniqueClasses.map(c => `<option value="${c}" ${initialKelas === c ? 'selected' : ''}>${c}</option>`).join('')
                 : '<option value="">(Belum Ada Kelas)</option>';
 
+            const siswaFromRecord = data?.siswa ? String(data.siswa).replace(/\s*\([^)]*\)\s*$/, '') : '';
             const initialSiswaList = db.siswa.filter(s => s.kelas === initialKelas);
-            let siswaOptions = initialSiswaList.length > 0
-                ? initialSiswaList.map(s => `<option value="${s.nama}">${s.nama}</option>`).join('')
+            const siswaOptions = initialSiswaList.length > 0
+                ? initialSiswaList.map(s => `<option value="${s.nama}" ${siswaFromRecord === s.nama ? 'selected' : ''}>${s.nama}</option>`).join('')
                 : '<option value="">(Tidak ada siswa)</option>';
 
-            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-comments"></i> Tambah Catatan Konseling`;
+            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-comments"></i> ${data ? 'Edit' : 'Tambah'} Catatan Konseling`;
             document.getElementById('modalBody').innerHTML = `
                 <div id="formCatatan" class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal</label>
-                        <input type="date" id="mCatTgl" value="${new Date().toISOString().split('T')[0]}" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">
+                        <input type="date" id="mCatTgl" value="${data?.tanggal || new Date().toISOString().split('T')[0]}" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
@@ -2584,12 +2588,18 @@
                             </select>
                         </div>
                     </div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Kasus / Isi Catatan</label><textarea id="mCatKasus" rows="2" required placeholder="Siswa sering terlambat..." class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></textarea></div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tindak Lanjut (Opsional)</label><textarea id="mCatLanjut" rows="2" placeholder="Telah dilakukan pemanggilan orang tua..." class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></textarea></div>
+                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Kasus / Isi Catatan</label><textarea id="mCatKasus" rows="2" required placeholder="Siswa sering terlambat..." class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">${data?.kasus || ''}</textarea></div>
+                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tindak Lanjut (Opsional)</label><textarea id="mCatLanjut" rows="2" placeholder="Telah dilakukan pemanggilan orang tua..." class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">${data?.tindakLanjut || ''}</textarea></div>
                 </div>
             `;
             openModal();
         }
+
+        function editCatatan(id) {
+            const item = db.catatan.find(c => String(c.id) === String(id));
+            if (item) openModalCatatan(item);
+        }
+
         async function saveCatatan() {
             const tanggal = document.getElementById('mCatTgl').value;
             const kelas = document.getElementById('mCatKelas').value;
@@ -2600,20 +2610,31 @@
             if (!kasus) return notifyError('Isi kasus/catatan terlebih dahulu!');
             const filter = getActiveGlobalFilter();
             const siswaFinal = `${siswaRaw} (${kelas})`;
-            db.catatan.push({ id: 'C' + Date.now(), tanggal, siswa: siswaFinal, kelas: kelas, ta: filter.ta, kasus, tindakLanjut });
+
+            if (currentEditingId) {
+                const idx = db.catatan.findIndex(c => String(c.id) === String(currentEditingId));
+                if (idx === -1) return notifyError('Data catatan tidak ditemukan.');
+                db.catatan[idx] = { ...db.catatan[idx], tanggal, siswa: siswaFinal, kelas, ta: db.catatan[idx].ta || filter.ta, kasus, tindakLanjut };
+            } else {
+                db.catatan.push({ id: 'C' + Date.now(), tanggal, siswa: siswaFinal, kelas, ta: filter.ta, kasus, tindakLanjut });
+            }
+
+            const isEdit = !!currentEditingId;
             const ok = await saveDb('catatan');
             if (!ok) return;
+            currentEditingId = null;
             closeModal();
-            notifySuccess('Catatan konseling tersimpan!');
+            notifySuccess(`Catatan konseling berhasil ${isEdit ? 'diperbarui' : 'disimpan'}!`);
             renderModuleContent('catatan');
         }
-        function deleteCatatan(id) {
-            Swal.fire({ title: 'Hapus Catatan?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' })
-            .then((res) => {
-                if (res.isConfirmed) {
-                    db.catatan = db.catatan.filter(c => c.id !== id); saveDb('catatan'); notifySuccess('Catatan dihapus!'); renderModuleContent('catatan');
-                }
-            });
+        async function deleteCatatan(id) {
+            const res = await Swal.fire({ title: 'Hapus Catatan?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' });
+            if (!res.isConfirmed) return;
+            db.catatan = db.catatan.filter(c => c.id !== id);
+            const ok = await saveDb('catatan');
+            if (!ok) return;
+            notifySuccess('Catatan dihapus!');
+            renderModuleContent('catatan');
         }
 
         // ==========================================
@@ -2723,7 +2744,7 @@
             container.insertAdjacentHTML('beforeend', html);
         }
 
-        function savePiket() {
+        async function savePiket() {
             const hari = document.getElementById('mPikHari').value;
             
             if (currentEditingId) {
@@ -2756,9 +2777,12 @@
                 db.piket.push(...newEntries);
             }
 
-            saveDb('piket'); 
-            closeModal(); 
-            notifySuccess(`Jadwal piket berhasil ${currentEditingId ? 'diperbarui' : 'ditambahkan'}!`); 
+            const isEdit = !!currentEditingId;
+            const ok = await saveDb('piket');
+            if (!ok) return;
+            currentEditingId = null;
+            closeModal();
+            notifySuccess(`Jadwal piket berhasil ${isEdit ? 'diperbarui' : 'ditambahkan'}!`);
             renderModuleContent('piket');
         }
 
@@ -2814,7 +2838,14 @@
                                     <div class="text-xs text-slate-600 italic bg-slate-50 p-3 rounded-xl border border-slate-100">"${r.isi}"</div>
                                 </div>
                                 <div class="mt-4 pt-3 border-t border-slate-100 text-right relative z-10">
-                                    <button onclick="deleteRefleksi('${r.id}')" class="text-rose-500 hover:text-rose-700 font-semibold text-xs transition">Hapus Catatan</button>
+                                    <div class="flex items-center justify-end gap-3">
+                                        <button onclick="editRefleksi('${r.id}')" class="text-brand-600 hover:text-brand-800 font-semibold text-xs transition flex items-center gap-1">
+                                            <i class="fa-solid fa-pen-to-square"></i> Edit
+                                        </button>
+                                        <button onclick="deleteRefleksi('${r.id}')" class="text-rose-500 hover:text-rose-700 font-semibold text-xs transition flex items-center gap-1">
+                                            <i class="fa-solid fa-trash"></i> Hapus
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `).join('')}
@@ -2822,25 +2853,39 @@
                 </div>
             `; 
         }
-        function openModalRefleksi() {
+        function openModalRefleksi(item = null) {
             const activeFilter = getActiveGlobalFilter();
-            
+
             const uniqueMapels = [...new Set(db.mapel.map(m => m.nama))].filter(Boolean).sort();
-            const mapelOptions = uniqueMapels.length > 0 
-                ? uniqueMapels.map(mName => `<option value="${mName}" ${activeFilter.mapel === mName ? 'selected' : ''}>${mName}</option>`).join('')
+            const mapelOptions = uniqueMapels.length > 0
+                ? uniqueMapels.map(mName => `<option value="${mName}" ${(item?.mapel || activeFilter.mapel) === mName ? 'selected' : ''}>${mName}</option>`).join('')
                 : '<option value="">(Belum Ada Mapel)</option>';
 
             const uniqueClasses = [...new Set(db.siswa.map(s => s.kelas))].filter(Boolean).sort();
-            const kelasOptions = uniqueClasses.length > 0 
-                ? uniqueClasses.map(c => `<option value="${c}" ${activeFilter.kelas === c ? 'selected' : ''}>${c}</option>`).join('')
+            const kelasOptions = uniqueClasses.length > 0
+                ? uniqueClasses.map(c => `<option value="${c}" ${(item?.kelas || activeFilter.kelas) === c ? 'selected' : ''}>${c}</option>`).join('')
                 : '<option value="">(Belum Ada Kelas)</option>';
 
-            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-lightbulb"></i> Tambah Catatan Refleksi`;
+            const isEdit = !!item;
+            const tanggal = item?.tanggal || new Date().toISOString().split('T')[0];
+
+            document.getElementById('modalTitle').innerHTML =
+                isEdit
+                    ? `<i class="fa-solid fa-pen-to-square"></i> Edit Catatan Refleksi`
+                    : `<i class="fa-solid fa-lightbulb"></i> Tambah Catatan Refleksi`;
+
             document.getElementById('modalBody').innerHTML = `
                 <div id="formRefleksi" class="space-y-3">
+                    <input type="hidden" id="mRefId" value="${item?.id || ''}">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal</label><input type="date" id="mRefTgl" value="${new Date().toISOString().split('T')[0]}" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Judul / Topik</label><input type="text" id="mRefJudul" placeholder="Evaluasi Mengajar Hari Ini" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Tanggal</label>
+                            <input type="date" id="mRefTgl" value="${tanggal}" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Judul / Topik</label>
+                            <input type="text" id="mRefJudul" value="${item?.judul || ''}" placeholder="Evaluasi Mengajar Hari Ini" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -2856,35 +2901,85 @@
                             </select>
                         </div>
                     </div>
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Isi Refleksi / Motivasi</label><textarea id="mRefIsi" rows="4" placeholder="Metode diskusi kelompok hari ini berjalan dengan sangat baik..." required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500"></textarea></div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Isi Refleksi / Motivasi</label>
+                        <textarea id="mRefIsi" rows="4" placeholder="Metode diskusi kelompok hari ini berjalan dengan sangat baik..." required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500">${item?.isi || ''}</textarea>
+                    </div>
                 </div>
             `;
             openModal();
         }
+
+        function editRefleksi(id) {
+            const item = db.refleksi.find(r => String(r.id) === String(id));
+            if (!item) return notifyError('Data refleksi tidak ditemukan.');
+            openModalRefleksi(item);
+        }
+
         async function saveRefleksi() {
+            const id = document.getElementById('mRefId')?.value.trim();
             const tanggal = document.getElementById('mRefTgl').value;
             const judul = document.getElementById('mRefJudul').value.trim();
             const isi = document.getElementById('mRefIsi').value.trim();
             const mapel = document.getElementById('mRefMapel').value;
             const kelas = document.getElementById('mRefKelas').value;
+
             if (!judul || !isi) return notifyError('Lengkapi form terlebih dahulu!');
             if (!mapel) return notifyError('Harap pilih Mata Pelajaran!');
             if (!kelas) return notifyError('Harap pilih Kelas!');
+
             const filter = getActiveGlobalFilter();
-            db.refleksi.push({ id: 'R' + Date.now(), tanggal, judul, isi, mapel: mapel.trim(), kelas: kelas.trim(), ta: filter.ta });
+            const record = {
+                id: id || ('R' + Date.now()),
+                tanggal,
+                judul,
+                isi,
+                mapel: mapel.trim(),
+                kelas: kelas.trim(),
+                ta: filter.ta
+            };
+
+            if (id) {
+                const index = db.refleksi.findIndex(r => String(r.id) === String(id));
+                if (index < 0) return notifyError('Data refleksi tidak ditemukan.');
+                db.refleksi[index] = { ...db.refleksi[index], ...record };
+            } else {
+                db.refleksi.push(record);
+            }
+
             const ok = await saveDb('refleksi');
             if (!ok) return;
+
             closeModal();
-            notifySuccess('Refleksi & motivasi disimpan!');
+            notifySuccess(id ? 'Refleksi & motivasi berhasil diperbarui!' : 'Refleksi & motivasi disimpan!');
             renderModuleContent('refleksi');
         }
-        function deleteRefleksi(id) {
-            Swal.fire({ title: 'Hapus Refleksi?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' })
-            .then((res) => {
-                if (res.isConfirmed) {
-                    db.refleksi = db.refleksi.filter(r => r.id !== id); saveDb('refleksi'); notifySuccess('Refleksi dihapus!'); renderModuleContent('refleksi');
-                }
+
+        async function deleteRefleksi(id) {
+            const res = await Swal.fire({
+                title: 'Hapus Refleksi?',
+                text: 'Data akan terhapus!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f43f5e',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
             });
+
+            if (!res.isConfirmed) return;
+
+            const backup = [...db.refleksi];
+            db.refleksi = db.refleksi.filter(r => String(r.id) !== String(id));
+
+            const ok = await saveDb('refleksi');
+            if (!ok) {
+                db.refleksi = backup;
+                return;
+            }
+
+            notifySuccess('Refleksi & motivasi berhasil dihapus!');
+            renderModuleContent('refleksi');
         }
 
         // ==========================================
@@ -2924,7 +3019,10 @@
                                                 </span>
                                             </td>
                                             <td class="p-4 text-right">
-                                                <button onclick="deleteInventaris('${i.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition">Hapus</button>
+                                                <div class="flex justify-end gap-2">
+                                                    <button onclick="editInventaris('${i.id}')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition flex items-center gap-1"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                                                    <button onclick="deleteInventaris('${i.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition flex items-center gap-1"><i class="fa-solid fa-trash-can"></i> Hapus</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     `).join('')}
@@ -2935,38 +3033,57 @@
                 </div>
             `; 
         }
-        function openModalInventaris() {
-            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-boxes-packing"></i> Tambah Barang Inventaris`;
+        function openModalInventaris(data = null) {
+            currentEditingId = data ? data.id : null;
+            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-boxes-packing"></i> ${data ? 'Edit' : 'Tambah'} Barang Inventaris`;
             document.getElementById('modalBody').innerHTML = `
                 <div id="formInventaris" class="space-y-3">
-                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama / Jenis Barang</label><input type="text" id="mInvNama" placeholder="Spidol Whiteboard, Meja Guru, dll" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none"></div>
+                    <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama / Jenis Barang</label><input type="text" id="mInvNama" value="${data?.nama || ''}" placeholder="Spidol Whiteboard, Meja Guru, dll" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none"></div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Jumlah</label><input type="number" id="mInvJml" value="1" min="1" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none"></div>
-                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Kondisi</label><select id="mInvKon" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none"><option>Baik</option><option>Rusak Ringan</option><option>Rusak Berat</option></select></div>
+                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Jumlah</label><input type="number" id="mInvJml" value="${data?.jumlah || 1}" min="1" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none"></div>
+                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Kondisi</label><select id="mInvKon" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none"><option ${data?.kondisi === 'Baik' || !data ? 'selected' : ''}>Baik</option><option ${data?.kondisi === 'Rusak Ringan' ? 'selected' : ''}>Rusak Ringan</option><option ${data?.kondisi === 'Rusak Berat' ? 'selected' : ''}>Rusak Berat</option></select></div>
                     </div>
                 </div>
             `;
             openModal();
         }
+
+        function editInventaris(id) {
+            const item = db.inventaris.find(i => String(i.id) === String(id));
+            if (item) openModalInventaris(item);
+        }
+
         async function saveInventaris() {
             const nama = document.getElementById('mInvNama').value.trim();
             const jumlah = document.getElementById('mInvJml').value;
             const kondisi = document.getElementById('mInvKon').value;
             if (!nama) return notifyError('Nama barang wajib diisi!');
-            db.inventaris.push({ id: 'I' + Date.now(), nama, jumlah, kondisi });
+
+            const isEdit = !!currentEditingId;
+            if (isEdit) {
+                const idx = db.inventaris.findIndex(i => String(i.id) === String(currentEditingId));
+                if (idx === -1) return notifyError('Data inventaris tidak ditemukan.');
+                db.inventaris[idx] = { ...db.inventaris[idx], nama, jumlah, kondisi };
+            } else {
+                db.inventaris.push({ id: 'I' + Date.now(), nama, jumlah, kondisi });
+            }
+
             const ok = await saveDb('inventaris');
             if (!ok) return;
+            currentEditingId = null;
             closeModal();
-            notifySuccess('Barang ditambahkan ke inventaris!');
+            notifySuccess(`Barang inventaris berhasil ${isEdit ? 'diperbarui' : 'ditambahkan'}!`);
             renderModuleContent('inventaris');
         }
-        function deleteInventaris(id) {
-            Swal.fire({ title: 'Hapus Barang Inventaris?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' })
-            .then((res) => {
-                if (res.isConfirmed) {
-                    db.inventaris = db.inventaris.filter(i => i.id !== id); saveDb('inventaris'); notifySuccess('Barang dihapus dari inventaris!'); renderModuleContent('inventaris');
-                }
-            });
+
+        async function deleteInventaris(id) {
+            const res = await Swal.fire({ title: 'Hapus Barang Inventaris?', text: 'Data akan terhapus!', icon: 'warning', showCancelButton: true, confirmButtonColor: '#f43f5e', cancelButtonColor: '#64748b', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Cancel' });
+            if (!res.isConfirmed) return;
+            db.inventaris = db.inventaris.filter(i => i.id !== id);
+            const ok = await saveDb('inventaris');
+            if (!ok) return;
+            notifySuccess('Barang dihapus dari inventaris!');
+            renderModuleContent('inventaris');
         }
 
         function renderRaporView(container, filter) { 

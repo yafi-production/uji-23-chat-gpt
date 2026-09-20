@@ -599,6 +599,15 @@
             } catch (e) {}
         }
 
+        async function gasRequestWithTimeout(action, payload = {}, timeoutMs = 10000) {
+            return await Promise.race([
+                gasRequest(action, payload),
+                new Promise((_, reject) => setTimeout(() => reject(new Error(
+                    `Permintaan "${action}" melebihi batas waktu ${Math.round(timeoutMs / 1000)} detik.`
+                )), timeoutMs))
+            ]);
+        }
+
         async function gasRequest(action, payload = {}) {
             if (!GAS_API_URL) throw new Error('URL Web App Google Apps Script belum diatur.');
             const body = { action, ...payload };
@@ -719,6 +728,7 @@
         }
 
         async function ensureModuleData(key, filters = {}, force = false) {
+            if (key === 'pengaturan') return;
             const signature = makeModuleSignature(key, filters);
             if (!force && moduleLoadedSignatures[key] === signature) return;
             await loadModuleData(key, filters);
@@ -1166,14 +1176,28 @@
                 // Pengaturan bukan DATA module. Ambil SETTINGS secara langsung agar tidak
                 // menunggu endpoint /module yang memang tidak memiliki modul "pengaturan".
                 if (modKey === 'pengaturan') {
-                    const result = await gasRequest('get_settings', {});
-                    if (result && result.settings) {
-                        db.pengaturan = { ...(db.pengaturan || {}), ...result.settings };
-                        syncLoginSchoolBrand();
-                        updateHeaderUI();
-                        applySidebarConfig();
+                    // Admin: settings sudah tersedia dari bootstrap. Render langsung tanpa request tambahan.
+                    if (currentUser && currentUser.role === 'Admin Sistem') {
+                        renderPengaturanView(container);
+                        return;
                     }
+
+                    // Guru: tampilkan cache terlebih dahulu, lalu refresh di background dengan timeout.
                     renderPengaturanView(container);
+                    if (currentUser && currentUser.role === 'Guru Mapel') {
+                        try {
+                            const result = await gasRequestWithTimeout('get_settings', {}, 8000);
+                            if (result && result.settings) {
+                                db.pengaturan = { ...(db.pengaturan || {}), ...result.settings };
+                                syncLoginSchoolBrand();
+                                updateHeaderUI();
+                                applySidebarConfig();
+                                renderPengaturanView(container);
+                            }
+                        } catch (refreshError) {
+                            console.warn('[Pengaturan] Refresh settings dilewati:', refreshError);
+                        }
+                    }
                     return;
                 }
 

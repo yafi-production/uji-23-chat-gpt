@@ -3517,7 +3517,8 @@
             });
         }
         
-        function renderPengaturanView(container) {
+        async function renderPengaturanView(container) {
+            await refreshGlobalSettingsForCurrentUser();
             if (currentUser && currentUser.role === 'Siswa') {
                 const avatarUrl = currentUser.foto || 'https://placehold.co/150x150/eff6ff/1d4ed8?text=' + currentUser.nama.charAt(0);
                 container.innerHTML = `
@@ -3544,6 +3545,8 @@
                 const roleLabel = isGuru ? 'Guru' : 'Admin';
                 const userAvatar = currentUser.foto || 'https://placehold.co/150x150/eff6ff/1d4ed8?text=' + currentUser.nama.charAt(0);
                 const userNip = currentUser.nip || '';
+                const settings = db.pengaturan || {};
+                const schoolReadOnly = currentUser.role === 'Guru Mapel' ? 'readonly' : '';
 
                 // Reset temporary variables ketika menu dibuka
                 tempSchoolLogo = null;
@@ -3552,8 +3555,8 @@
                 container.innerHTML = `
                     <div class="space-y-4 animate-fade-in max-w-4xl pb-10">
                         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                            <h2 class="font-bold text-lg text-slate-800">Pengaturan Identitas Sekolah & Guru</h2>
-                            <p class="text-xs text-slate-500 mt-1">Konfigurasi data cetak dokumen dan bobot penilaian</p>
+                            <h2 class="font-bold text-lg text-slate-800">Pengaturan ${roleLabel}</h2>
+                            <p class="text-xs text-slate-500 mt-1">${isGuru ? 'Profil sekolah, identitas guru, dan bobot penilaian pribadi.' : 'Profil sekolah, identitas admin, bobot penilaian, dan pengaturan sistem.'}</p>
                         </div>
 
                         <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
@@ -3566,16 +3569,16 @@
                                         <div class="w-16 h-16 rounded-full border border-slate-200 p-1 shrink-0 flex items-center justify-center overflow-hidden bg-white shadow-sm">
                                             <img id="previewSettingsLogo" src="${db.pengaturan.logo}" class="w-full h-full object-contain" onerror="this.src='https://placehold.co/150x150/ffffff/1e40af?text=Logo'">
                                         </div>
-                                        <div class="flex-1">
+                                        ${currentUser.role === 'Admin Sistem' ? `<div class="flex-1">
                                             <label class="block text-xs font-semibold text-slate-600 mb-1">Upload Foto/Logo Sekolah (PNG/JPG)</label>
                                             <input type="file" accept="image/*" onchange="handleImageUpload(event, 'previewSettingsLogo', 'logo')" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 border border-slate-200 rounded-xl cursor-pointer">
-                                        </div>
+                                        </div>` : `<div class="flex-1 text-xs text-slate-400">Profil sekolah dikelola oleh Admin Sistem.</div>`}
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama Sekolah</label><input type="text" id="setSekolah" value="${db.pengaturan.sekolah}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Alamat Sekolah</label><input type="text" id="setAlamat" value="${db.pengaturan.alamat}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama Kepala Sekolah</label><input type="text" id="setKepsek" value="${db.pengaturan.kepsek}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">NIP Kepala Sekolah</label><input type="text" id="setNipKepsek" value="${db.pengaturan.nipKepsek}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama Sekolah</label><input type="text" id="setSekolah" value="${settings.sekolah || ''}" ${schoolReadOnly} class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Alamat Sekolah</label><input type="text" id="setAlamat" value="${settings.alamat || ''}" ${schoolReadOnly} class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama Kepala Sekolah</label><input type="text" id="setKepsek" value="${settings.kepsek || ''}" ${schoolReadOnly} class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">NIP Kepala Sekolah</label><input type="text" id="setNipKepsek" value="${settings.nipKepsek || ''}" ${schoolReadOnly} class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
                                     </div>
                                 </div>
 
@@ -3598,7 +3601,7 @@
                                 </div>
 
                                 <!-- Manajemen Sidebar -->
-                                <div>
+                                <div class="${currentUser.role === 'Admin Sistem' ? '' : 'hidden'}">
                                     <h3 class="text-sm font-bold text-brand-600 flex items-center gap-2 border-b pb-2 mb-5"><i class="fa-solid fa-bars-staggered"></i> Manajemen Sidebar Guru & Siswa</h3>
                                     <p class="text-xs text-slate-500 mb-5">Admin dapat mengaktifkan/nonaktifkan menu dan mengubah nama menu yang tampil pada Guru maupun Siswa. Menonaktifkan menu tidak menghapus data.</p>
                                     <div class="flex flex-wrap gap-2 mb-4">
@@ -3630,15 +3633,15 @@
                                 <div>
                                     <h3 class="text-sm font-bold text-brand-600 flex items-center gap-2 border-b pb-2 mb-5"><i class="fa-solid fa-percent"></i> Bobot Penilaian (%)</h3>
                                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tugas (%)</label><input type="number" id="setBobotTugas" value="${db.pengaturan.bobotTugas}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">UH (%)</label><input type="number" id="setBobotUH" value="${db.pengaturan.bobotUH}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">UTS (%)</label><input type="number" id="setBobotUTS" value="${db.pengaturan.bobotUTS}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
-                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">UAS (%)</label><input type="number" id="setBobotUAS" value="${db.pengaturan.bobotUAS}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">Tugas (%)</label><input type="number" id="setBobotTugas" value="${settings.bobotTugas ?? 20}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">UH (%)</label><input type="number" id="setBobotUH" value="${settings.bobotUH ?? 30}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">UTS (%)</label><input type="number" id="setBobotUTS" value="${settings.bobotUTS ?? 20}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
+                                        <div><label class="block text-xs font-semibold text-slate-600 mb-1">UAS (%)</label><input type="number" id="setBobotUAS" value="${settings.bobotUAS ?? 30}" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-brand-500 transition"></div>
                                     </div>
                                 </div>
 
                                 <div class="pt-2">
-                                    <button type="button" onclick="savePengaturan()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl shadow-md transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan Pengaturan Sistem</button>
+                                    <button type="button" onclick="savePengaturan()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl shadow-md transition flex items-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Simpan Pengaturan</button>
                                 </div>
                             </div>
                         </div>
@@ -3874,9 +3877,13 @@
                 if (role === 'admin') el.classList.remove('hidden');
                 else el.classList.toggle('hidden', !h.keys.some(k => cfg[role][k] && cfg[role][k].enabled));
             });
-            ['nav-admin_users','nav-gascode','nav-pengaturan'].forEach(id => {
+            ['nav-admin_users','nav-gascode'].forEach(id => {
                 const el=document.getElementById(id); if(el) el.classList.toggle('hidden', role !== 'admin');
             });
+            const pengaturanEl=document.getElementById('nav-pengaturan');
+            if(pengaturanEl) pengaturanEl.classList.toggle('hidden', role === 'siswa');
+            const sistemHeader=document.getElementById('header-sistem');
+            if(sistemHeader) sistemHeader.classList.toggle('hidden', role === 'siswa');
         }
 
         function isSidebarModuleEnabled(modKey) {
@@ -3898,6 +3905,7 @@
         }
 
         async function savePengaturan() {
+            const isGuru = currentUser && currentUser.role === 'Guru Mapel';
             const settings = {
                 sekolah: document.getElementById('setSekolah')?.value || '',
                 alamat: document.getElementById('setAlamat')?.value || '',
@@ -3906,56 +3914,46 @@
                 bobotTugas: parseFloat(document.getElementById('setBobotTugas')?.value) || 20,
                 bobotUH: parseFloat(document.getElementById('setBobotUH')?.value) || 30,
                 bobotUTS: parseFloat(document.getElementById('setBobotUTS')?.value) || 20,
-                bobotUAS: parseFloat(document.getElementById('setBobotUAS')?.value) || 30,
-                sidebarAccess: currentUser && currentUser.role === 'Admin Sistem' ? collectSidebarConfigFromForm() : getSidebarConfig()
+                bobotUAS: parseFloat(document.getElementById('setBobotUAS')?.value) || 30
             };
-
-            if (tempSchoolLogo) settings.logo = tempSchoolLogo;
+            if (tempSchoolLogo && !isGuru) settings.logo = tempSchoolLogo;
             else if (db.pengaturan?.logo) settings.logo = db.pengaturan.logo;
 
             try {
-                db.pengaturan = { ...(db.pengaturan || {}), ...settings };
-                syncLoginSchoolBrand();
-                // Tes endpoint terlebih dahulu supaya error deployment tidak tertukar dengan error data.
                 await testGasConnection();
+                const profile = {
+                    nama: document.getElementById('setUserName')?.value.trim() || '',
+                    nip: document.getElementById('setUserNip')?.value.trim() || '',
+                    foto: tempTeacherPhoto !== null ? tempTeacherPhoto : (currentUser.foto || '')
+                };
+                if (!profile.nama) return notifyError('Nama tidak boleh kosong!');
 
-                if (currentUser && (currentUser.role === 'Admin Sistem' || currentUser.role === 'Guru Mapel')) {
-                    const profile = {
-                        nama: document.getElementById('setUserName')?.value.trim() || '',
-                        nip: document.getElementById('setUserNip')?.value.trim() || '',
-                        foto: tempTeacherPhoto !== null ? tempTeacherPhoto : (currentUser.foto || '')
-                    };
+                const pr = await gasRequest('profile', {data: profile});
+                if (pr.user) { currentUser = pr.user; updateStoredUser(currentUser); }
 
-                    if (!profile.nama) return notifyError('Nama tidak boleh kosong!');
-
-                    try {
-                        const result = await gasRequest('profile', { data: profile });
-                        currentUser = result.user;
-                        updateStoredUser(currentUser)
-                    } catch (e) {
-                        throw new Error('Gagal menyimpan Profil Pengguna: ' + e.message);
-                    }
-                }
-
-                if (currentUser && currentUser.role === 'Admin Sistem') {
-                    try {
-                        await gasRequest('settings', { data: settings });
-                        db.pengaturan = { ...(db.pengaturan || {}), ...settings };
-                        applySidebarConfig();
-                    } catch (e) {
-                        throw new Error('Gagal menyimpan Profil Sekolah/Pengaturan Sistem: ' + e.message);
-                    }
+                if (currentUser.role === 'Admin Sistem') {
+                    settings.sidebarAccess = collectSidebarConfigFromForm();
+                    const r = await gasRequest('settings', {data: settings});
+                    db.pengaturan = {...(db.pengaturan || {}), ...(r.settings || settings)};
+                    applySidebarConfig();
+                    syncLoginSchoolBrand();
+                    updateHeaderUI();
+                    notifySuccess('Pengaturan sistem dan profil berhasil diperbarui!');
+                } else if (isGuru) {
+                    const r = await gasRequest('teacher_settings', {data: {
+                        bobotTugas: settings.bobotTugas,
+                        bobotUH: settings.bobotUH,
+                        bobotUTS: settings.bobotUTS,
+                        bobotUAS: settings.bobotUAS
+                    }});
+                    db.pengaturan = {...(db.pengaturan || {}), ...(r.settings || {})};
+                    syncLoginSchoolBrand();
+                    updateHeaderUI();
+                    notifySuccess('Profil Guru dan bobot penilaian berhasil diperbarui!');
                 }
 
                 tempSchoolLogo = null;
                 tempTeacherPhoto = null;
-                updateHeaderUI();
-
-                notifySuccess(
-                    currentUser && currentUser.role === 'Admin Sistem'
-                        ? 'Pengaturan sistem dan profil berhasil diperbarui!'
-                        : 'Profil berhasil diperbarui!'
-                );
             } catch (error) {
                 console.error('[Save Pengaturan]', error);
                 notifyError(error.message || 'Gagal menyimpan pengaturan.');

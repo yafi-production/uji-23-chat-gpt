@@ -295,59 +295,59 @@
                 class="bg-slate-900 text-slate-300 w-64 space-y-1 py-4 px-2 absolute inset-y-0 left-0 transform -translate-x-full lg:relative lg:translate-x-0 transition duration-200 ease-in-out z-20 shadow-xl flex flex-col justify-between overflow-y-auto">
                 <div class="space-y-1">
                     <div class="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Navigasi Utama</div>
-                    <div onclick="switchModule('dashboard')" id="nav-dashboard"
+                    <div onclick="switchModule('dashboard')" id="nav-dashboard" data-menu-key="dashboard"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition active-nav">
                         <i class="fa-solid fa-chart-pie w-5 text-center text-amber-400"></i> Dashboard Utama
                     </div>
-                    <div onclick="switchModule('siswa')" id="nav-siswa"
+                    <div onclick="switchModule('siswa')" id="nav-siswa" data-menu-key="siswa"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-user-graduate w-5 text-center text-blue-400"></i> Data Siswa
                     </div>
-                    <div onclick="switchModule('mapel')" id="nav-mapel"
+                    <div onclick="switchModule('mapel')" id="nav-mapel" data-menu-key="mapel"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-book w-5 text-center text-emerald-400"></i> Master Mata Pelajaran
                     </div>
-                    <div onclick="switchModule('jadwal')" id="nav-jadwal"
+                    <div onclick="switchModule('jadwal')" id="nav-jadwal" data-menu-key="jadwal"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-calendar-days w-5 text-center text-purple-400"></i> Jadwal Mengajar
                     </div>
 
                     <div class="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Aktivitas KBM</div>
-                    <div onclick="switchModule('absensi')" id="nav-absensi"
+                    <div onclick="switchModule('absensi')" id="nav-absensi" data-menu-key="absensi"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-clipboard-user w-5 text-center text-teal-400"></i> Absensi Siswa
                     </div>
-                    <div onclick="switchModule('nilai')" id="nav-nilai"
+                    <div onclick="switchModule('nilai')" id="nav-nilai" data-menu-key="nilai"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-award w-5 text-center text-yellow-400"></i> Nilai Siswa
                     </div>
-                    <div onclick="switchModule('jurnal')" id="nav-jurnal"
+                    <div onclick="switchModule('jurnal')" id="nav-jurnal" data-menu-key="jurnal"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-journal-whills w-5 text-center text-rose-400"></i> Jurnal Mengajar
                     </div>
-                    <div onclick="switchModule('tugas')" id="nav-tugas"
+                    <div onclick="switchModule('tugas')" id="nav-tugas" data-menu-key="tugas"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-list-check w-5 text-center text-sky-400"></i> Tugas Siswa
                     </div>
 
                     <div id="header-manajemen" class="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Manajemen & Operasional</div>
-                    <div onclick="switchModule('catatan')" id="nav-catatan"
+                    <div onclick="switchModule('catatan')" id="nav-catatan" data-menu-key="catatan"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-comments w-5 text-center text-indigo-400"></i> Catatan Konseling
                     </div>
-                    <div onclick="switchModule('piket')" id="nav-piket"
+                    <div onclick="switchModule('piket')" id="nav-piket" data-menu-key="piket"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-user-shield w-5 text-center text-orange-400"></i> Jadwal Piket
                     </div>
-                    <div onclick="switchModule('refleksi')" id="nav-refleksi"
+                    <div onclick="switchModule('refleksi')" id="nav-refleksi" data-menu-key="refleksi"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-lightbulb w-5 text-center text-amber-300"></i> Refleksi & Motivasi
                     </div>
-                    <div onclick="switchModule('inventaris')" id="nav-inventaris"
+                    <div onclick="switchModule('inventaris')" id="nav-inventaris" data-menu-key="inventaris"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-boxes-packing w-5 text-center text-cyan-400"></i> Inventaris Kelas
                     </div>
-                    <div onclick="switchModule('rapor')" id="nav-rapor"
+                    <div onclick="switchModule('rapor')" id="nav-rapor" data-menu-key="rapor"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-file-invoice w-5 text-center text-emerald-400"></i> Cetak Rapor
                     </div>
@@ -445,7 +445,39 @@
             bobotTugas: 20,
             bobotUH: 30,
             bobotUTS: 20,
-            bobotUAS: 30
+            bobotUAS: 30,
+            sidebarAccess: {
+                guru: {
+                    dashboard: { enabled: true, label: 'Dashboard Utama' },
+                    siswa: { enabled: true, label: 'Data Siswa' },
+                    mapel: { enabled: true, label: 'Master Mata Pelajaran' },
+                    jadwal: { enabled: true, label: 'Jadwal Mengajar' },
+                    absensi: { enabled: true, label: 'Absensi Siswa' },
+                    nilai: { enabled: true, label: 'Nilai Siswa' },
+                    jurnal: { enabled: true, label: 'Jurnal Mengajar' },
+                    tugas: { enabled: true, label: 'Tugas Siswa' },
+                    catatan: { enabled: true, label: 'Catatan Konseling' },
+                    piket: { enabled: true, label: 'Jadwal Piket' },
+                    refleksi: { enabled: true, label: 'Refleksi & Motivasi' },
+                    inventaris: { enabled: true, label: 'Inventaris Kelas' },
+                    rapor: { enabled: true, label: 'Cetak Rapor' }
+                },
+                siswa: {
+                    dashboard: { enabled: true, label: 'Dashboard Utama' },
+                    siswa: { enabled: false, label: 'Data Siswa' },
+                    mapel: { enabled: false, label: 'Mata Pelajaran' },
+                    jadwal: { enabled: true, label: 'Jadwal Pelajaran' },
+                    absensi: { enabled: true, label: 'Absensi Saya' },
+                    nilai: { enabled: true, label: 'Nilai Saya' },
+                    jurnal: { enabled: false, label: 'Jurnal Mengajar' },
+                    tugas: { enabled: true, label: 'Tugas Siswa' },
+                    catatan: { enabled: false, label: 'Catatan Konseling' },
+                    piket: { enabled: false, label: 'Jadwal Piket' },
+                    refleksi: { enabled: true, label: 'Refleksi & Motivasi' },
+                    inventaris: { enabled: false, label: 'Inventaris Kelas' },
+                    rapor: { enabled: true, label: 'Rapor Saya' }
+                }
+            }
         };
 
         const INITIAL_MAPEL = [
@@ -874,69 +906,16 @@
 
                 updateHeaderUI();
                 
-                const adminOnly = ['admin_users', 'gascode'];
-                const guruAdminOnly = ['catatan', 'piket', 'refleksi', 'inventaris', 'rapor', 'mapel', 'jurnal'];
-                
-                if (currentUser.role === 'Siswa' && (adminOnly.includes(currentActiveModule) || guruAdminOnly.includes(currentActiveModule))) {
-                    currentActiveModule = 'dashboard';
-                } else if (currentUser.role === 'Guru Mapel' && adminOnly.includes(currentActiveModule)) {
+                if (!isSidebarModuleEnabled(currentActiveModule)) {
                     currentActiveModule = 'dashboard';
                 }
-                
+                applySidebarConfig();
                 switchModule(currentActiveModule);
 
                 const roleEl = document.getElementById('headerTeacherRole');
                 if (roleEl) roleEl.textContent = currentUser.role;
                 const nameEl = document.getElementById('headerTeacherName');
                 if (nameEl) nameEl.textContent = currentUser.nama;
-
-                const adminOnlyMenus = ['nav-admin_users', 'nav-gascode'];
-                adminOnlyMenus.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        if (currentUser.role === 'Admin Sistem') el.classList.remove('hidden');
-                        else el.classList.add('hidden');
-                    }
-                });
-
-                const manajemenSiswaMenus = ['nav-catatan', 'nav-piket', 'nav-refleksi', 'nav-inventaris', 'nav-rapor'];
-                manajemenSiswaMenus.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        if (currentUser.role === 'Siswa') el.classList.add('hidden');
-                        else el.classList.remove('hidden');
-                    }
-                });
-
-                const navMapel = document.getElementById('nav-mapel');
-                if (navMapel) {
-                    if (currentUser.role === 'Siswa') navMapel.classList.add('hidden');
-                    else navMapel.classList.remove('hidden');
-                }
-
-                const navJadwal = document.getElementById('nav-jadwal');
-                if (navJadwal) {
-                    if (currentUser.role === 'Siswa') navJadwal.innerHTML = '<i class="fa-solid fa-calendar-days w-5 text-center text-purple-400"></i> Jadwal Pelajaran';
-                    else navJadwal.innerHTML = '<i class="fa-solid fa-calendar-days w-5 text-center text-purple-400"></i> Jadwal Mengajar';
-                }
-
-                const navJurnal = document.getElementById('nav-jurnal');
-                if (navJurnal) {
-                    if (currentUser.role === 'Siswa') navJurnal.classList.add('hidden');
-                    else navJurnal.classList.remove('hidden');
-                }
-
-                const headerManajemen = document.getElementById('header-manajemen');
-                if (headerManajemen) {
-                    if (currentUser.role === 'Siswa') headerManajemen.classList.add('hidden');
-                    else headerManajemen.classList.remove('hidden');
-                }
-
-                const headerSistem = document.getElementById('header-sistem');
-                if (headerSistem) {
-                    if (currentUser.role === 'Siswa' || currentUser.role === 'Guru Mapel') headerSistem.classList.add('hidden');
-                    else headerSistem.classList.remove('hidden');
-                }
             } else {
                 if (loginScreen) loginScreen.classList.remove('hidden');
                 if (mainApp) {
@@ -1158,6 +1137,10 @@
         });
 
         async function switchModule(modKey) {
+            if (!isSidebarModuleEnabled(modKey)) {
+                if (modKey !== 'dashboard') notifyError('Menu ini sedang dinonaktifkan oleh Admin.');
+                modKey = 'dashboard';
+            }
             currentActiveModule = modKey;
             try { localStorage.setItem('siags_activeModule', modKey); } catch (e) { }
 
@@ -3614,6 +3597,35 @@
                                     </div>
                                 </div>
 
+                                <!-- Manajemen Sidebar -->
+                                <div>
+                                    <h3 class="text-sm font-bold text-brand-600 flex items-center gap-2 border-b pb-2 mb-5"><i class="fa-solid fa-bars-staggered"></i> Manajemen Sidebar Guru & Siswa</h3>
+                                    <p class="text-xs text-slate-500 mb-5">Admin dapat mengaktifkan/nonaktifkan menu dan mengubah nama menu yang tampil pada Guru maupun Siswa. Menonaktifkan menu tidak menghapus data.</p>
+                                    <div class="flex flex-wrap gap-2 mb-4">
+                                        <button type="button" onclick="setAllSidebarAccess('guru', true)" class="px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100">☑ Aktifkan Semua Guru</button>
+                                        <button type="button" onclick="setAllSidebarAccess('guru', false)" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200">☐ Nonaktifkan Semua Guru</button>
+                                        <button type="button" onclick="setAllSidebarAccess('siswa', true)" class="px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold hover:bg-emerald-100">☑ Aktifkan Semua Siswa</button>
+                                        <button type="button" onclick="setAllSidebarAccess('siswa', false)" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200">☐ Nonaktifkan Semua Siswa</button>
+                                    </div>
+                                    <div class="overflow-x-auto border border-slate-200 rounded-2xl">
+                                        <table class="w-full min-w-[760px] text-xs">
+                                            <thead class="bg-slate-50 border-b border-slate-200">
+                                                <tr>
+                                                    <th class="text-left px-4 py-3 font-bold text-slate-600">Menu</th>
+                                                    <th class="px-4 py-3 font-bold text-slate-600 w-20 text-center">Guru</th>
+                                                    <th class="px-4 py-3 font-bold text-slate-600 w-20 text-center">Siswa</th>
+                                                    <th class="px-4 py-3 font-bold text-slate-600">Nama Menu Guru</th>
+                                                    <th class="px-4 py-3 font-bold text-slate-600">Nama Menu Siswa</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="sidebarAccessTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                                        </table>
+                                    </div>
+                                    <div class="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-100 text-[11px] text-blue-700">
+                                        <i class="fa-solid fa-circle-info mr-1"></i> Pengaturan ini berlaku berdasarkan role. Admin tetap memiliki seluruh menu sistem.
+                                    </div>
+                                </div>
+
                                 <!-- Bobot Penilaian -->
                                 <div>
                                     <h3 class="text-sm font-bold text-brand-600 flex items-center gap-2 border-b pb-2 mb-5"><i class="fa-solid fa-percent"></i> Bobot Penilaian (%)</h3>
@@ -3632,6 +3644,7 @@
                         </div>
                     </div>
                 `;
+                renderSidebarAccessSettings();
             }
         }
 
@@ -3749,6 +3762,131 @@
             });
         }
 
+        const SIDEBAR_MENU_DEFS = [
+            { key: 'dashboard', labelGuru: 'Dashboard Utama', labelSiswa: 'Dashboard Utama', icon: 'fa-chart-pie' },
+            { key: 'siswa', labelGuru: 'Data Siswa', labelSiswa: 'Data Siswa', icon: 'fa-user-graduate' },
+            { key: 'mapel', labelGuru: 'Master Mata Pelajaran', labelSiswa: 'Mata Pelajaran', icon: 'fa-book' },
+            { key: 'jadwal', labelGuru: 'Jadwal Mengajar', labelSiswa: 'Jadwal Pelajaran', icon: 'fa-calendar-days' },
+            { key: 'absensi', labelGuru: 'Absensi Siswa', labelSiswa: 'Absensi Saya', icon: 'fa-clipboard-user' },
+            { key: 'nilai', labelGuru: 'Nilai Siswa', labelSiswa: 'Nilai Saya', icon: 'fa-award' },
+            { key: 'jurnal', labelGuru: 'Jurnal Mengajar', labelSiswa: 'Jurnal Mengajar', icon: 'fa-journal-whills' },
+            { key: 'tugas', labelGuru: 'Tugas Siswa', labelSiswa: 'Tugas Siswa', icon: 'fa-list-check' },
+            { key: 'catatan', labelGuru: 'Catatan Konseling', labelSiswa: 'Catatan Konseling', icon: 'fa-comments' },
+            { key: 'piket', labelGuru: 'Jadwal Piket', labelSiswa: 'Jadwal Piket', icon: 'fa-user-shield' },
+            { key: 'refleksi', labelGuru: 'Refleksi & Motivasi', labelSiswa: 'Refleksi & Motivasi', icon: 'fa-lightbulb' },
+            { key: 'inventaris', labelGuru: 'Inventaris Kelas', labelSiswa: 'Inventaris Kelas', icon: 'fa-boxes-packing' },
+            { key: 'rapor', labelGuru: 'Cetak Rapor', labelSiswa: 'Rapor Saya', icon: 'fa-file-invoice' }
+        ];
+
+        function getSidebarConfig() {
+            const base = DEFAULT_SETTINGS.sidebarAccess || {};
+            const current = (db.pengaturan && db.pengaturan.sidebarAccess) || {};
+            const out = { guru: {}, siswa: {} };
+            ['guru','siswa'].forEach(role => {
+                SIDEBAR_MENU_DEFS.forEach(def => {
+                    const fallbackLabel = role === 'guru' ? def.labelGuru : def.labelSiswa;
+                    const item = (current[role] && current[role][def.key]) || (base[role] && base[role][def.key]) || {};
+                    out[role][def.key] = {
+                        enabled: item.enabled !== false,
+                        label: String(item.label || fallbackLabel).trim() || fallbackLabel
+                    };
+                });
+            });
+            return out;
+        }
+
+        function renderSidebarAccessSettings() {
+            const body = document.getElementById('sidebarAccessTableBody');
+            if (!body) return;
+            const cfg = getSidebarConfig();
+            body.innerHTML = SIDEBAR_MENU_DEFS.map(def => {
+                const g = cfg.guru[def.key], s = cfg.siswa[def.key];
+                return `<tr>
+                    <td class="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap"><i class="fa-solid ${def.icon} w-5 text-center text-brand-500 mr-2"></i>${escapeHtml(def.labelGuru)}</td>
+                    <td class="px-4 py-3 text-center"><input type="checkbox" id="sidebar_guru_enabled_${def.key}" ${g.enabled ? 'checked' : ''} class="w-4 h-4 accent-blue-600 cursor-pointer"></td>
+                    <td class="px-4 py-3 text-center"><input type="checkbox" id="sidebar_siswa_enabled_${def.key}" ${s.enabled ? 'checked' : ''} class="w-4 h-4 accent-blue-600 cursor-pointer"></td>
+                    <td class="px-4 py-2"><input type="text" id="sidebar_guru_label_${def.key}" value="${escapeHtml(g.label)}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-500"></td>
+                    <td class="px-4 py-2"><input type="text" id="sidebar_siswa_label_${def.key}" value="${escapeHtml(s.label)}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-500"></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
+        function setAllSidebarAccess(role, enabled) {
+            SIDEBAR_MENU_DEFS.forEach(def => {
+                const el = document.getElementById(`sidebar_${role}_enabled_${def.key}`);
+                if (el) el.checked = !!enabled;
+            });
+        }
+
+        function collectSidebarConfigFromForm() {
+            const cfg = { guru: {}, siswa: {} };
+            ['guru','siswa'].forEach(role => {
+                SIDEBAR_MENU_DEFS.forEach(def => {
+                    const check = document.getElementById(`sidebar_${role}_enabled_${def.key}`);
+                    const input = document.getElementById(`sidebar_${role}_label_${def.key}`);
+                    const fallback = role === 'guru' ? def.labelGuru : def.labelSiswa;
+                    cfg[role][def.key] = {
+                        enabled: !!(check && check.checked),
+                        label: String(input ? input.value : fallback).trim() || fallback
+                    };
+                });
+            });
+            return cfg;
+        }
+
+        function applySidebarConfig() {
+            if (!currentUser) return;
+            const role = currentUser.role === 'Siswa' ? 'siswa' : currentUser.role === 'Guru Mapel' ? 'guru' : 'admin';
+            const cfg = getSidebarConfig();
+            SIDEBAR_MENU_DEFS.forEach(def => {
+                const el = document.getElementById('nav-' + def.key);
+                if (!el) return;
+                const icon = el.querySelector('i');
+                let textNode = null;
+                for (let i = el.childNodes.length - 1; i >= 0; i--) {
+                    if (el.childNodes[i].nodeType === 3 && el.childNodes[i].textContent.trim()) { textNode = el.childNodes[i]; break; }
+                }
+                if (role === 'admin') {
+                    el.classList.remove('hidden');
+                    if (textNode) textNode.textContent = ' ' + (def.key === 'jadwal' ? 'Jadwal Mengajar' : def.key === 'mapel' ? 'Master Mata Pelajaran' : def.key === 'absensi' ? 'Absensi Siswa' : def.key === 'nilai' ? 'Nilai Siswa' : def.key === 'jurnal' ? 'Jurnal Mengajar' : def.key === 'tugas' ? 'Tugas Siswa' : def.key === 'catatan' ? 'Catatan Konseling' : def.key === 'piket' ? 'Jadwal Piket' : def.key === 'refleksi' ? 'Refleksi & Motivasi' : def.key === 'inventaris' ? 'Inventaris Kelas' : def.key === 'rapor' ? 'Cetak Rapor' : def.key === 'siswa' ? 'Data Siswa' : 'Dashboard Utama');
+                    return;
+                }
+                const item = cfg[role][def.key];
+                if (item && item.enabled) {
+                    el.classList.remove('hidden');
+                    if (textNode) textNode.textContent = ' ' + item.label;
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+
+            const headers = [
+                { id:'header-manajemen', keys:['catatan','piket','refleksi','inventaris','rapor'] },
+                { id:'header-sistem', keys:[] }
+            ];
+            headers.forEach(h => {
+                const el = document.getElementById(h.id);
+                if (!el) return;
+                if (role === 'admin') el.classList.remove('hidden');
+                else el.classList.toggle('hidden', !h.keys.some(k => cfg[role][k] && cfg[role][k].enabled));
+            });
+            ['nav-admin_users','nav-gascode','nav-pengaturan'].forEach(id => {
+                const el=document.getElementById(id); if(el) el.classList.toggle('hidden', role !== 'admin');
+            });
+        }
+
+        function isSidebarModuleEnabled(modKey) {
+            if (!currentUser || currentUser.role === 'Admin Sistem') return true;
+            const role = currentUser.role === 'Siswa' ? 'siswa' : 'guru';
+            const cfg = getSidebarConfig();
+            const parent = modKey === 'kolomNilai' ? 'nilai' : (modKey === 'raporCatatan' ? 'rapor' : modKey);
+            return !!(cfg[role] && cfg[role][parent] && cfg[role][parent].enabled);
+        }
+
         async function savePengaturanSiswa() {
             const newPass = document.getElementById('setSiswaPassword').value;
             if (!newPass) return notifyError('Password tidak boleh kosong!');
@@ -3768,7 +3906,8 @@
                 bobotTugas: parseFloat(document.getElementById('setBobotTugas')?.value) || 20,
                 bobotUH: parseFloat(document.getElementById('setBobotUH')?.value) || 30,
                 bobotUTS: parseFloat(document.getElementById('setBobotUTS')?.value) || 20,
-                bobotUAS: parseFloat(document.getElementById('setBobotUAS')?.value) || 30
+                bobotUAS: parseFloat(document.getElementById('setBobotUAS')?.value) || 30,
+                sidebarAccess: currentUser && currentUser.role === 'Admin Sistem' ? collectSidebarConfigFromForm() : getSidebarConfig()
             };
 
             if (tempSchoolLogo) settings.logo = tempSchoolLogo;
@@ -3802,6 +3941,7 @@
                     try {
                         await gasRequest('settings', { data: settings });
                         db.pengaturan = { ...(db.pengaturan || {}), ...settings };
+                        applySidebarConfig();
                     } catch (e) {
                         throw new Error('Gagal menyimpan Profil Sekolah/Pengaturan Sistem: ' + e.message);
                     }

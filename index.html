@@ -174,6 +174,14 @@
                         </div>
                     </div>
 
+                    <div class="flex items-center justify-between pt-1">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="rememberLogin" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <span class="text-xs text-slate-600">Ingat saya di perangkat ini</span>
+                        </label>
+                        <span class="text-[10px] text-slate-400">Sesi hingga 30 hari</span>
+                    </div>
+
                     <div class="pt-2">
                         <button type="button" onclick="handleUnifiedLogin(event)"
                             class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm transition shadow-md flex justify-center items-center gap-2">
@@ -513,25 +521,55 @@
         // =========================================================
         // SECURE GAS API CLIENT
         // Database utama = Google Sheets melalui Code.gs.
-        // localStorage/sessionStorage hanya menyimpan sesi/token, bukan database.
+        // localStorage/sessionStorage hanya menyimpan token sesi + profil user, bukan database/password.
         // =========================================================
         const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwxAqobKIo6PawpEDdNHa-R1aa1bn43UFF2iqQbHxhDmi-ZCuFYFEcR9IIzdqz9VWMh/exec'; // Tempel URL Web App GAS hasil Deploy di sini.
         const SESSION_TOKEN_KEY = 'siags_session_token';
         const SESSION_USER_KEY = 'siags_loggedInUser';
+        const REMEMBER_LOGIN_KEY = 'siags_remember_login';
 
+        // Password tidak pernah disimpan di browser. Hanya token sesi dan
+        // profil publik user yang disimpan agar login dapat dipertahankan.
         function getSessionToken() {
-            try { return sessionStorage.getItem(SESSION_TOKEN_KEY) || ''; } catch (e) { return ''; }
+            try {
+                return localStorage.getItem(SESSION_TOKEN_KEY) || sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+            } catch (e) { return ''; }
         }
 
-        function setSession(token, user) {
+        function getStoredUser() {
             try {
-                sessionStorage.setItem(SESSION_TOKEN_KEY, token || '');
-                sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user || null));
+                const remembered = localStorage.getItem(REMEMBER_LOGIN_KEY) === '1';
+                const raw = remembered ? localStorage.getItem(SESSION_USER_KEY) : sessionStorage.getItem(SESSION_USER_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        }
+
+        function setSession(token, user, remember = true) {
+            try {
+                localStorage.removeItem(SESSION_TOKEN_KEY);
+                localStorage.removeItem(SESSION_USER_KEY);
+                sessionStorage.removeItem(SESSION_TOKEN_KEY);
+                sessionStorage.removeItem(SESSION_USER_KEY);
+                localStorage.setItem(REMEMBER_LOGIN_KEY, remember ? '1' : '0');
+                const storage = remember ? localStorage : sessionStorage;
+                storage.setItem(SESSION_TOKEN_KEY, token || '');
+                storage.setItem(SESSION_USER_KEY, JSON.stringify(user || null));
+            } catch (e) { console.warn('[SIAGS Session]', e); }
+        }
+
+        function updateStoredUser(user) {
+            try {
+                const remember = localStorage.getItem(REMEMBER_LOGIN_KEY) === '1';
+                const storage = remember ? localStorage : sessionStorage;
+                storage.setItem(SESSION_USER_KEY, JSON.stringify(user || null));
             } catch (e) {}
         }
 
         function clearSession() {
             try {
+                localStorage.removeItem(SESSION_TOKEN_KEY);
+                localStorage.removeItem(SESSION_USER_KEY);
+                localStorage.removeItem(REMEMBER_LOGIN_KEY);
                 sessionStorage.removeItem(SESSION_TOKEN_KEY);
                 sessionStorage.removeItem(SESSION_USER_KEY);
             } catch (e) {}
@@ -610,7 +648,7 @@
             });
             if (serverData.currentUser) {
                 currentUser = serverData.currentUser;
-                try { sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser)); } catch (e) {}
+                updateStoredUser(currentUser)
             }
             if (db.pengaturan && db.pengaturan.ta) {
                 activeTA = db.pengaturan.ta;
@@ -691,7 +729,7 @@
                 activeTA = db.pengaturan.ta;
                 activeSiswaTAFilter = activeTA;
             }
-            try { currentUser = JSON.parse(sessionStorage.getItem(SESSION_USER_KEY)) || null; } catch (e) { currentUser = null; }
+            currentUser = getStoredUser();
             checkAuth();
         }
 
@@ -945,7 +983,7 @@
 
         async function processLoginAttempt(user) {
             currentUser = user;
-            try { sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(user)); } catch (e) { }
+            updateStoredUser(user)
             checkAuth();
             notifySuccess(`Selamat datang, ${user.nama}!`);
             try {
@@ -967,7 +1005,9 @@
                 if (user.role === 'Admin Sistem') setLoginRole('Admin');
                 else if (user.role === 'Guru Mapel') setLoginRole('Guru');
                 else if (user.role === 'Siswa') setLoginRole('Siswa');
-                setSession(result.token, user);
+                const rememberEl = document.getElementById('rememberLogin');
+                const remember = rememberEl ? !!rememberEl.checked : true;
+                setSession(result.token, user, remember);
                 await processLoginAttempt(user);
             } catch (error) {
                 notifyError(error.message || 'Email atau password tidak valid!');
@@ -3722,7 +3762,7 @@
             if (!newPass) return notifyError('Password tidak boleh kosong!');
             try {
                 const result = await gasRequest('change_password', { password: newPass });
-                if (result.user) { currentUser = result.user; sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser)); }
+                if (result.user) { currentUser = result.user; updateStoredUser(currentUser); }
                 notifySuccess('Password berhasil diperbarui!');
             } catch (error) { notifyError(error.message); }
         }
@@ -3758,7 +3798,7 @@
                     try {
                         const result = await gasRequest('profile', { data: profile });
                         currentUser = result.user;
-                        try { sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(currentUser)); } catch (e) {}
+                        updateStoredUser(currentUser)
                     } catch (e) {
                         throw new Error('Gagal menyimpan Profil Pengguna: ' + e.message);
                     }

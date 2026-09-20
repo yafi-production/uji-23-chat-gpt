@@ -1163,6 +1163,20 @@
             }
 
             try {
+                // Pengaturan bukan DATA module. Ambil SETTINGS secara langsung agar tidak
+                // menunggu endpoint /module yang memang tidak memiliki modul "pengaturan".
+                if (modKey === 'pengaturan') {
+                    const result = await gasRequest('get_settings', {});
+                    if (result && result.settings) {
+                        db.pengaturan = { ...(db.pengaturan || {}), ...result.settings };
+                        syncLoginSchoolBrand();
+                        updateHeaderUI();
+                        applySidebarConfig();
+                    }
+                    renderPengaturanView(container);
+                    return;
+                }
+
                 const filter = modKey === 'rapor'
                     ? { ta: activeRaporTAFilter || '', kelas: activeRaporKelasFilter || '', mapel: '' }
                     : getActiveGlobalFilter();

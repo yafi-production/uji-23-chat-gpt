@@ -1147,7 +1147,10 @@
         });
 
         async function switchModule(modKey) {
-            if (!isSidebarModuleEnabled(modKey)) {
+            // Pengaturan Sistem adalah route sistem/profil, bukan modul checklist.
+            // Jangan pernah memblokir route ini karena sidebarAccess.
+            const isSettingsRoute = (modKey === 'pengaturan');
+            if (!isSettingsRoute && !isSidebarModuleEnabled(modKey)) {
                 if (modKey !== 'dashboard') notifyError('Menu ini sedang dinonaktifkan oleh Admin.');
                 modKey = 'dashboard';
             }
@@ -3925,6 +3928,8 @@
         }
 
         function isSidebarModuleEnabled(modKey) {
+            // Pengaturan Sistem selalu boleh dibuka oleh user yang sudah login.
+            if (modKey === 'pengaturan') return !!currentUser;
             if (!currentUser || currentUser.role === 'Admin Sistem') return true;
             const role = currentUser.role === 'Siswa' ? 'siswa' : 'guru';
             const cfg = getSidebarConfig();

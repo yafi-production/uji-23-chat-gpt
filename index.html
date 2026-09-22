@@ -531,6 +531,8 @@
         let currentUser = null;
         const moduleLoadedSignatures = {};
         const moduleSnapshots = {};
+        const moduleMemoryCache = {};
+        const MODULE_CACHE_TTL = 3 * 60 * 1000; // 3 menit
         let tempStudentUploadedPhoto = null;
         let tempSchoolLogo = null;
         let tempTeacherPhoto = null;
@@ -696,6 +698,17 @@
             snapshotModule('siswa');
             snapshotModule('mapel');
             snapshotModule('jadwal');
+
+            // Bootstrap sudah membawa data dasar ini. Tandai sebagai cache lokal
+            // sehingga klik menu pertama tidak melakukan request GAS kedua.
+            const bootstrapFilter = getActiveGlobalFilter();
+            ['siswa','mapel','jadwal'].forEach(key => {
+                moduleLoadedSignatures[key] = makeModuleSignature(key, bootstrapFilter);
+                moduleMemoryCache[makeModuleSignature(key, bootstrapFilter)] = {
+                    data: JSON.parse(JSON.stringify({ [key]: db[key] })),
+                    updatedAt: Date.now()
+                };
+            });
             return result.data;
         }
 
@@ -716,8 +729,14 @@
         }
 
         async function loadModuleData(key, filters = {}) {
+            const signature = makeModuleSignature(key, filters);
             const result = await gasRequest('module', { module: key, filters });
             applyServerData(result.data);
+
+            moduleMemoryCache[signature] = {
+                data: JSON.parse(JSON.stringify(result.data || {})),
+                updatedAt: Date.now()
+            };
             Object.keys(result.data || {}).forEach(k => {
                 if (k in db) {
                     moduleLoadedSignatures[k] = makeModuleSignature(k, filters);
@@ -729,9 +748,39 @@
 
         async function ensureModuleData(key, filters = {}, force = false) {
             if (key === 'pengaturan') return;
+
             const signature = makeModuleSignature(key, filters);
-            if (!force && moduleLoadedSignatures[key] === signature) return;
+            const cached = moduleMemoryCache[signature];
+            const age = cached ? Date.now() - cached.updatedAt : Infinity;
+
+            // Cache hit: tampilkan data lokal tanpa menunggu GAS.
+            if (!force && cached) {
+                applyServerData(cached.data);
+                moduleLoadedSignatures[key] = signature;
+                snapshotModule(key);
+                return cached.data;
+            }
+
+            // Tidak ada cache: baru ambil dari server.
             await loadModuleData(key, filters);
+        }
+
+        async function refreshModuleInBackground(key, filters = {}) {
+            if (key === 'pengaturan' || !GAS_API_URL) return;
+            const signature = makeModuleSignature(key, filters);
+            const cached = moduleMemoryCache[signature];
+            if (cached && (Date.now() - cached.updatedAt) < MODULE_CACHE_TTL) return;
+
+            try {
+                await loadModuleData(key, filters);
+                // Hanya render ulang jika user masih berada di modul/filter yang sama.
+                if (currentActiveModule === key &&
+                    makeModuleSignature(key, getActiveGlobalFilter()) === signature) {
+                    renderModuleContent(key);
+                }
+            } catch (error) {
+                console.warn('[Background Refresh]', key, error);
+            }
         }
 
         function syncLoginSchoolBrand() {
@@ -838,6 +887,10 @@
 
                 if (result.data) applyServerData(result.data);
                 snapshotModule(key);
+                Object.keys(moduleMemoryCache).forEach(cacheKey => {
+                    if (cacheKey.startsWith(key + '|')) delete moduleMemoryCache[cacheKey];
+                });
+                moduleLoadedSignatures[key] = '';
                 return true;
             } catch (error) {
                 console.error('[Secure Save]', error);
@@ -1194,7 +1247,16 @@
             if (window.innerWidth < 1024 && !sidebar.classList.contains('-translate-x-full')) sidebar.classList.add('-translate-x-full');
 
             const container = document.getElementById('moduleContentContainer');
-            if (container) {
+            const currentFilters = modKey === 'rapor'
+                ? { ta: activeRaporTAFilter || '', kelas: activeRaporKelasFilter || '', mapel: '' }
+                : getActiveGlobalFilter();
+            const moduleSignature = makeModuleSignature(modKey, currentFilters);
+            const hasCache = !!moduleMemoryCache[moduleSignature] ||
+                moduleLoadedSignatures[modKey] === moduleSignature;
+
+            // Hanya tampilkan spinner pada first-load. Jika pernah dimuat,
+            // render dari memory cache terlebih dahulu agar perpindahan menu terasa instan.
+            if (container && !hasCache && modKey !== 'pengaturan') {
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center py-20 text-slate-400">
                         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-brand-500 mb-3"></i>
@@ -1207,11 +1269,13 @@
             try {
                 // Pengaturan bukan DATA module. Ambil SETTINGS secara langsung agar tidak
                 // menunggu endpoint /module yang memang tidak memiliki modul "pengaturan".
-                const filter = modKey === 'rapor'
-                    ? { ta: activeRaporTAFilter || '', kelas: activeRaporKelasFilter || '', mapel: '' }
-                    : getActiveGlobalFilter();
-                await ensureModuleData(modKey, filter, modKey === 'rapor');
+                const filter = currentFilters;
+                await ensureModuleData(modKey, filter, false);
                 renderModuleContent(modKey);
+
+                // Jika cache sudah ada, halaman tampil sekarang dan server disegarkan
+                // di belakang tanpa mengunci UI.
+                refreshModuleInBackground(modKey, filter);
             } catch (error) {
                 console.error('[Lazy Module]', error);
                 if (container) {

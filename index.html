@@ -532,6 +532,7 @@
         const moduleLoadedSignatures = {};
         const moduleSnapshots = {};
         const moduleMemoryCache = {};
+        const dirtyModules = new Set();
         const MODULE_CACHE_TTL = 3 * 60 * 1000; // 3 menit
         let tempStudentUploadedPhoto = null;
         let tempSchoolLogo = null;
@@ -731,6 +732,14 @@
         async function loadModuleData(key, filters = {}) {
             const signature = makeModuleSignature(key, filters);
             const result = await gasRequest('module', { module: key, filters });
+
+            // Jangan pernah menimpa perubahan lokal yang belum disimpan.
+            // Ini penting karena refresh background dapat selesai setelah guru
+            // sudah menekan tombol H/S/I/A/D.
+            if (dirtyModules.has(key)) {
+                return result.data;
+            }
+
             applyServerData(result.data);
 
             moduleMemoryCache[signature] = {
@@ -766,13 +775,16 @@
         }
 
         async function refreshModuleInBackground(key, filters = {}) {
-            if (key === 'pengaturan' || !GAS_API_URL) return;
+            if (key === 'pengaturan' || !GAS_API_URL || dirtyModules.has(key)) return;
             const signature = makeModuleSignature(key, filters);
             const cached = moduleMemoryCache[signature];
             if (cached && (Date.now() - cached.updatedAt) < MODULE_CACHE_TTL) return;
 
             try {
                 await loadModuleData(key, filters);
+                // Jika selama request guru melakukan perubahan, jangan render
+                // ulang dari response server yang masih lama.
+                if (dirtyModules.has(key)) return;
                 // Hanya render ulang jika user masih berada di modul/filter yang sama.
                 if (currentActiveModule === key &&
                     makeModuleSignature(key, getActiveGlobalFilter()) === signature) {
@@ -858,6 +870,7 @@
                     const result = await gasRequest('save', { key, data: current, deletedIds: [] });
                     if (result.data) applyServerData(result.data);
                     snapshotModule(key);
+                    dirtyModules.delete(key);
                     return true;
                 }
 
@@ -877,7 +890,10 @@
                     if (!newMap.has(id)) deletedIds.push(id);
                 });
 
-                if (!changed.length && !deletedIds.length) return true;
+                if (!changed.length && !deletedIds.length) {
+                    dirtyModules.delete(key);
+                    return true;
+                }
 
                 const result = await gasRequest('save', {
                     key,
@@ -887,15 +903,18 @@
 
                 if (result.data) applyServerData(result.data);
                 snapshotModule(key);
+                dirtyModules.delete(key);
                 Object.keys(moduleMemoryCache).forEach(cacheKey => {
                     if (cacheKey.startsWith(key + '|')) delete moduleMemoryCache[cacheKey];
                 });
                 moduleLoadedSignatures[key] = '';
                 return true;
             } catch (error) {
+                // Pertahankan perubahan lokal ketika penyimpanan gagal.
+                // Jangan reload dari server karena response server bisa masih lama
+                // dan akan membuat pilihan status guru terlihat hilang.
                 console.error('[Secure Save]', error);
                 notifyError(error.message);
-                try { await loadModuleData(key, getActiveGlobalFilter(), true); } catch (e) {}
                 return false;
             }
         }
@@ -2129,25 +2148,69 @@
             }
         }
 
+        function markModuleDirty(key) {
+            dirtyModules.add(key);
+        }
+
+        function createLocalRecordId(prefix = 'R') {
+            try {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    return prefix + window.crypto.randomUUID();
+                }
+            } catch (e) {}
+            return prefix + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+        }
+
         function setAbsenStatus(siswaId, status, btnElement) {
             const filter = getActiveGlobalFilter();
-            const idx = db.absensi.findIndex(a => a.siswaId === siswaId && a.tanggal === selectedAbsensiDate && a.mapel === filter.mapel);
-            if (idx !== -1) db.absensi[idx].status = status;
-            else db.absensi.push({ id: 'A' + Date.now(), tanggal: selectedAbsensiDate, siswaId, mapel: filter.mapel, kelas: filter.kelas, ta: filter.ta, status });
-            
+            const same = a => String(a.siswaId) === String(siswaId)
+                && String(a.tanggal) === String(selectedAbsensiDate)
+                && String(a.mapel || '') === String(filter.mapel || '')
+                && String(a.kelas || '') === String(filter.kelas || '')
+                && String(a.ta || '') === String(filter.ta || '');
+            const idx = db.absensi.findIndex(same);
+
+            if (idx !== -1) {
+                db.absensi[idx].status = status;
+            } else {
+                db.absensi.push({
+                    id: createLocalRecordId('A'),
+                    tanggal: selectedAbsensiDate,
+                    siswaId,
+                    mapel: filter.mapel || '',
+                    kelas: filter.kelas || '',
+                    ta: filter.ta || '',
+                    status
+                });
+            }
+
+            // Tandai dirty SEBELUM ada request background yang dapat selesai.
+            // Dengan ini pilihan H/S/I/A/D tidak akan ditimpa data lama dari server.
+            markModuleDirty('absensi');
+
             if (btnElement) {
                 const rowButtons = btnElement.parentElement.querySelectorAll('button');
                 rowButtons.forEach(b => b.className = 'px-2 py-0.5 text-[10px] font-bold rounded-lg transition text-slate-500 hover:text-slate-800');
                 btnElement.className = `px-2 py-0.5 text-[10px] font-bold rounded-lg transition ${getStatusBadgeClass(status)}`;
             } else {
-                renderModuleContent('absensi'); 
+                renderModuleContent('absensi');
             }
         }
 
-        function saveAbsensiManual() {
-            saveDb('absensi');
-            notifySuccess('Data absensi harian berhasil disimpan!');
-            renderModuleContent('absensi');
+        async function saveAbsensiManual() {
+            const saveBtn = document.querySelector('button[onclick="saveAbsensiManual()"]');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...';
+            }
+
+            const ok = await saveDb('absensi');
+            if (saveBtn) saveBtn.disabled = false;
+
+            if (ok) {
+                notifySuccess('Data absensi harian berhasil disimpan!');
+                renderModuleContent('absensi');
+            }
         }
 
         // --- BUG FIX: QR CAMERA TIDAK TERTUTUP ---

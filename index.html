@@ -1147,10 +1147,9 @@
         });
 
         async function switchModule(modKey) {
-            // Pengaturan Sistem adalah route sistem/profil, bukan modul checklist.
-            // Jangan pernah memblokir route ini karena sidebarAccess.
-            const isSettingsRoute = (modKey === 'pengaturan');
-            if (!isSettingsRoute && !isSidebarModuleEnabled(modKey)) {
+            // Pengaturan Sistem adalah route sistem dan tidak boleh dinonaktifkan
+            // oleh konfigurasi sidebar Guru/Siswa.
+            if (modKey !== 'pengaturan' && !isSidebarModuleEnabled(modKey)) {
                 if (modKey !== 'dashboard') notifyError('Menu ini sedang dinonaktifkan oleh Admin.');
                 modKey = 'dashboard';
             }
@@ -3558,8 +3557,10 @@
             });
         }
         
-        async function renderPengaturanView(container) {
-            await refreshGlobalSettingsForCurrentUser();
+        function renderPengaturanView(container) {
+            // Jangan melakukan request async di sini.
+            // Data SETTINGS sudah tersedia dari bootstrap/cache.
+            // Sinkronisasi terbaru untuk Guru dilakukan terpisah oleh switchModule().
             if (currentUser && currentUser.role === 'Siswa') {
                 const avatarUrl = currentUser.foto || 'https://placehold.co/150x150/eff6ff/1d4ed8?text=' + currentUser.nama.charAt(0);
                 container.innerHTML = `
@@ -3928,7 +3929,6 @@
         }
 
         function isSidebarModuleEnabled(modKey) {
-            // Pengaturan Sistem selalu boleh dibuka oleh user yang sudah login.
             if (modKey === 'pengaturan') return !!currentUser;
             if (!currentUser || currentUser.role === 'Admin Sistem') return true;
             const role = currentUser.role === 'Siswa' ? 'siswa' : 'guru';

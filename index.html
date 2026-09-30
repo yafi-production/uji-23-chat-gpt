@@ -341,7 +341,7 @@
     <!-- MAIN APP WRAPPER (Hidden initially) -->
     <div id="mainApp" class="hidden flex-col flex-1 relative w-full h-full min-h-screen">
         <header class="bg-gradient-to-r from-brand-900 via-brand-800 to-brand-700 text-white shadow-lg sticky top-0 z-30">
-            <div class="px-2 sm:px-4 py-2 sm:py-3 flex flex-nowrap items-center justify-between gap-2 sm:gap-4">
+            <div class="relative px-2 sm:px-4 py-2 sm:py-3 flex flex-nowrap items-center justify-between gap-2 sm:gap-4">
                 <!-- Left: Toggle Sidebar & School Brand -->
                 <div class="flex items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
                     <button id="sidebarToggleBtn" onclick="toggleSidebar()"
@@ -363,7 +363,7 @@
                 </div>
 
                 <!-- Middle: Live Clock Widget -->
-                <div class="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/20 text-xs font-mono shadow-inner shrink-0">
+                <div id="liveClockContainer" class="hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/20 text-xs font-mono shadow-inner whitespace-nowrap z-10">
                     <i class="fa-regular fa-clock text-amber-300 animate-pulse"></i>
                     <span id="liveClockDisplay">Minggu, 26 Juli 2026 | 00:00:00 WIB</span>
                 </div>
@@ -389,6 +389,16 @@
                 </div>
             </div>
         </header>
+        <style>
+            @media (max-width: 900px) and (min-width: 768px) {
+                #liveClockContainer {
+                    font-size: 10px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                }
+            }
+        </style>
+
 
         <div class="flex flex-1 relative overflow-hidden">
             <!-- SIDEBAR NAVIGATION -->

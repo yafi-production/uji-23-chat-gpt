@@ -1990,6 +1990,21 @@
             .then((res) => { if (res.isConfirmed) { db.mapel = db.mapel.filter(m => m.id !== id); saveDb('mapel'); notifySuccess('Mata pelajaran dihapus!'); renderModuleContent('mapel'); } });
         }
 
+        function normalizeAttendanceStatus(value) {
+            const raw = String(value ?? '').trim().toLowerCase();
+            const compact = raw.replace(/[._-]/g, '');
+            if (compact === 'h' || compact === 'hadir' || compact === 'present') return 'Hadir';
+            if (compact === 's' || compact === 'sakit' || compact === 'sick') return 'Sakit';
+            if (compact === 'i' || compact === 'izin' || compact === 'ijin') return 'Izin';
+            if (compact === 'a' || compact === 'alpa' || compact === 'alpha' || compact === 'absen') return 'Alpa';
+            if (compact === 'd' || compact === 'dispensasi' || compact === 'dispen') return 'Dispensasi';
+            return '';
+        }
+
+        function getAttendanceRecordStatus(rec) {
+            return normalizeAttendanceStatus(rec?.status ?? rec?.statusAbsensi ?? rec?.kehadiran ?? rec?.kodeStatus);
+        }
+
         function renderAbsensiView(container, filter) {
             const siswaKelas = db.siswa.filter(s => (s.kelas === filter.kelas || !filter.kelas) && (s.ta === filter.ta || !filter.ta));
             const saveBtnHtml = `
@@ -2030,9 +2045,9 @@
                                     siswaKelas.map((s, idx) => {
                                         const records = db.absensi.filter(a => a.siswaId === s.id && (!filter.mapel || a.mapel === filter.mapel));
                                         const recSelectedDate = records.find(a => a.tanggal === selectedAbsensiDate);
-                                        const curStatus = recSelectedDate ? recSelectedDate.status : 'Hadir';
+                                        const curStatus = recSelectedDate ? normalizeAttendanceStatus(recSelectedDate.status ?? recSelectedDate.statusAbsensi ?? recSelectedDate.kehadiran ?? recSelectedDate.kodeStatus) || 'Hadir' : 'Hadir';
                                         const totalMeetings = records.length || 1;
-                                        const countH = records.filter(a => a.status === 'Hadir').length;
+                                        const countH = records.filter(a => normalizeAttendanceStatus(a.status ?? a.statusAbsensi ?? a.kehadiran ?? a.kodeStatus) === 'Hadir').length;
                                         const persenIndividual = records.length === 0 ? 100 : Math.round((countH / totalMeetings) * 100);
 
                                         return `
@@ -2087,7 +2102,10 @@
                 const studentRecords = [];
                 uniqueDates.forEach(date => {
                     const rec = recordMap.get(`${siswa.id}__${date}`);
-                    if (rec) studentRecords.push(rec);
+                    if (rec) {
+                        const normalizedStatus = getAttendanceRecordStatus(rec);
+                        if (normalizedStatus) studentRecords.push({ ...rec, normalizedStatus });
+                    }
                 });
 
                 let totalHadir = 0;
@@ -2097,15 +2115,15 @@
                 let totalDispensasi = 0;
 
                 studentRecords.forEach(rec => {
-                    if (rec.status === 'Hadir') totalHadir++;
-                    else if (rec.status === 'Sakit') totalSakit++;
-                    else if (rec.status === 'Izin') totalIzin++;
-                    else if (rec.status === 'Alpa') totalAlpa++;
-                    else if (rec.status === 'Dispensasi') totalDispensasi++;
+                    switch (rec.normalizedStatus) {
+                        case 'Hadir': totalHadir++; break;
+                        case 'Sakit': totalSakit++; break;
+                        case 'Izin': totalIzin++; break;
+                        case 'Alpa': totalAlpa++; break;
+                        case 'Dispensasi': totalDispensasi++; break;
+                    }
                 });
 
-                // Persentase dihitung dari SELURUH daftar kehadiran
-                // yang benar-benar tercatat untuk siswa tersebut.
                 const totalKehadiran = totalHadir + totalSakit + totalIzin + totalAlpa + totalDispensasi;
                 const persen = totalKehadiran > 0
                     ? Math.round((totalHadir / totalKehadiran) * 100)
@@ -2145,7 +2163,7 @@
                 ? `<div class="p-6 text-center text-slate-400 text-xs">Tidak ada siswa</div>`
                 : siswaKelas.map((s, idx) => {
                     const st = getStudentStats(s);
-                    const statusMap = new Map(st.studentRecords.map(r => [r.tanggal, r.status]));
+                    const statusMap = new Map(st.studentRecords.map(r => [r.tanggal, r.normalizedStatus]));
 
                     const dateItems = uniqueDates.length === 0
                         ? `<div class="text-[10px] text-slate-400 italic">Belum ada data kehadiran.</div>`
@@ -2198,7 +2216,7 @@
                 ? `<tr><td colspan="${uniqueDates.length + 8}" class="p-6 text-center text-slate-400">Tidak ada siswa</td></tr>`
                 : siswaKelas.map((s, idx) => {
                     const st = getStudentStats(s);
-                    const statusMap = new Map(st.studentRecords.map(r => [r.tanggal, r.status]));
+                    const statusMap = new Map(st.studentRecords.map(r => [r.tanggal, r.normalizedStatus]));
 
                     const datesHtml = uniqueDates.length === 0
                         ? `<td class="p-3 text-center text-slate-300">-</td>`
@@ -2414,8 +2432,8 @@
                 let row = { 'No': idx + 1, 'Nama Siswa': s.nama };
                 let totalH = 0, totalS = 0, totalI = 0, totalA = 0, totalD = 0;
                 uniqueDates.forEach(date => {
-                    const rec = records.find(a => a.siswaId === s.id && a.tanggal === date);
-                    const status = rec ? rec.status : '-';
+                    const rec = records.find(a => String(a.siswaId) === String(s.id) && a.tanggal === date);
+                    const status = rec ? normalizeAttendanceStatus(rec.status ?? rec.statusAbsensi ?? rec.kehadiran ?? rec.kodeStatus) : '-';
                     let initial = '-';
                     if (status === 'Hadir') { initial = 'H'; totalH++; }
                     else if (status === 'Sakit') { initial = 'S'; totalS++; }
@@ -2449,8 +2467,8 @@
                     let rowHtml = `<tr><td class="border p-1 text-center">${idx + 1}</td><td class="border p-1 font-semibold text-left">${s.nama}</td>`;
                     let totalH = 0, totalS = 0, totalI = 0, totalA = 0, totalD = 0;
                     uniqueDates.forEach(date => {
-                        const rec = records.find(a => a.siswaId === s.id && a.tanggal === date);
-                        const status = rec ? rec.status : '-';
+                        const rec = records.find(a => String(a.siswaId) === String(s.id) && a.tanggal === date);
+                        const status = rec ? normalizeAttendanceStatus(rec.status ?? rec.statusAbsensi ?? rec.kehadiran ?? rec.kodeStatus) : '-';
                         let initial = '-', textColor = '';
                         if (status === 'Hadir') { initial = 'H'; textColor = 'text-emerald-600 font-bold'; totalH++; }
                         else if (status === 'Sakit') { initial = 'S'; textColor = 'text-blue-600 font-bold'; totalS++; }

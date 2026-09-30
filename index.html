@@ -101,26 +101,127 @@
             }
         }
 
-        /* Sticky adjustments for tables */
-        .sticky-col-1 {
-            position: sticky;
-            left: 0;
-            z-index: 10;
-            background: inherit;
-            border-right: 1px solid #f1f5f9;
+        /* Absensi: desktop table + mobile card layout */
+        .absensi-rekap-table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
         }
 
-        .sticky-col-2 {
+        .absensi-rekap-table {
+            min-width: max-content;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .absensi-rekap-table .sticky-col-1 {
             position: sticky;
-            left: 35px;
-            z-index: 10;
-            background: inherit;
-            border-right: 1px solid #f1f5f9;
+            left: 0;
+            z-index: 20;
+            width: 48px;
+            min-width: 48px;
+            background: #fff;
+            box-shadow: 2px 0 4px -3px rgba(15, 23, 42, .28);
+        }
+
+        .absensi-rekap-table .sticky-col-2 {
+            position: sticky;
+            left: 48px;
+            z-index: 20;
+            width: 190px;
+            min-width: 190px;
+            max-width: 190px;
+            background: #fff;
+            box-shadow: 2px 0 4px -3px rgba(15, 23, 42, .18);
+        }
+
+        .absensi-rekap-table thead .sticky-col-1,
+        .absensi-rekap-table thead .sticky-col-2 {
+            background: #f1f5f9;
+            z-index: 30;
+        }
+
+        .absensi-rekap-table .sticky-pct {
+            position: sticky;
+            right: 0;
+            z-index: 20;
+            min-width: 78px;
+            background: #eff6ff;
+            box-shadow: -3px 0 6px -4px rgba(15, 23, 42, .35);
+        }
+
+        .absensi-mobile-list {
+            display: block;
+        }
+
+        .absensi-mobile-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .absensi-mobile-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .absensi-mobile-stats {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .absensi-mobile-stat {
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .absensi-mobile-dates {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 10px 12px 12px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .absensi-mobile-date {
+            flex: 0 0 46px;
+            text-align: center;
+            font-size: 9px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .absensi-mobile-status {
+            margin-top: 4px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            font-size: 11px;
         }
 
         @media (min-width: 768px) {
-            .sticky-col-2 {
-                left: 45px;
+            .absensi-mobile-list {
+                display: none;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .absensi-desktop-table {
+                display: none;
             }
         }
     </style>
@@ -357,7 +458,7 @@
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition text-rose-300">
                         <i class="fa-solid fa-users-gear w-5 text-center"></i> Pengaturan Akun
                     </div>
-                    <div onclick="openPengaturanSystem()" id="nav-pengaturan"
+                    <div onclick="switchModule('pengaturan')" id="nav-pengaturan"
                         class="cursor-pointer nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-brand-600 hover:text-white transition">
                         <i class="fa-solid fa-sliders w-5 text-center text-slate-400"></i> Pengaturan Sistem
                     </div>
@@ -531,9 +632,6 @@
         let currentUser = null;
         const moduleLoadedSignatures = {};
         const moduleSnapshots = {};
-        const moduleMemoryCache = {};
-        const dirtyModules = new Set();
-        const MODULE_CACHE_TTL = 3 * 60 * 1000; // 3 menit
         let tempStudentUploadedPhoto = null;
         let tempSchoolLogo = null;
         let tempTeacherPhoto = null;
@@ -699,17 +797,6 @@
             snapshotModule('siswa');
             snapshotModule('mapel');
             snapshotModule('jadwal');
-
-            // Bootstrap sudah membawa data dasar ini. Tandai sebagai cache lokal
-            // sehingga klik menu pertama tidak melakukan request GAS kedua.
-            const bootstrapFilter = getActiveGlobalFilter();
-            ['siswa','mapel','jadwal'].forEach(key => {
-                moduleLoadedSignatures[key] = makeModuleSignature(key, bootstrapFilter);
-                moduleMemoryCache[makeModuleSignature(key, bootstrapFilter)] = {
-                    data: JSON.parse(JSON.stringify({ [key]: db[key] })),
-                    updatedAt: Date.now()
-                };
-            });
             return result.data;
         }
 
@@ -730,22 +817,8 @@
         }
 
         async function loadModuleData(key, filters = {}) {
-            const signature = makeModuleSignature(key, filters);
             const result = await gasRequest('module', { module: key, filters });
-
-            // Jangan pernah menimpa perubahan lokal yang belum disimpan.
-            // Ini penting karena refresh background dapat selesai setelah guru
-            // sudah menekan tombol H/S/I/A/D.
-            if (dirtyModules.has(key)) {
-                return result.data;
-            }
-
             applyServerData(result.data);
-
-            moduleMemoryCache[signature] = {
-                data: JSON.parse(JSON.stringify(result.data || {})),
-                updatedAt: Date.now()
-            };
             Object.keys(result.data || {}).forEach(k => {
                 if (k in db) {
                     moduleLoadedSignatures[k] = makeModuleSignature(k, filters);
@@ -757,42 +830,9 @@
 
         async function ensureModuleData(key, filters = {}, force = false) {
             if (key === 'pengaturan') return;
-
             const signature = makeModuleSignature(key, filters);
-            const cached = moduleMemoryCache[signature];
-            const age = cached ? Date.now() - cached.updatedAt : Infinity;
-
-            // Cache hit: tampilkan data lokal tanpa menunggu GAS.
-            if (!force && cached) {
-                applyServerData(cached.data);
-                moduleLoadedSignatures[key] = signature;
-                snapshotModule(key);
-                return cached.data;
-            }
-
-            // Tidak ada cache: baru ambil dari server.
+            if (!force && moduleLoadedSignatures[key] === signature) return;
             await loadModuleData(key, filters);
-        }
-
-        async function refreshModuleInBackground(key, filters = {}) {
-            if (key === 'pengaturan' || !GAS_API_URL || dirtyModules.has(key)) return;
-            const signature = makeModuleSignature(key, filters);
-            const cached = moduleMemoryCache[signature];
-            if (cached && (Date.now() - cached.updatedAt) < MODULE_CACHE_TTL) return;
-
-            try {
-                await loadModuleData(key, filters);
-                // Jika selama request guru melakukan perubahan, jangan render
-                // ulang dari response server yang masih lama.
-                if (dirtyModules.has(key)) return;
-                // Hanya render ulang jika user masih berada di modul/filter yang sama.
-                if (currentActiveModule === key &&
-                    makeModuleSignature(key, getActiveGlobalFilter()) === signature) {
-                    renderModuleContent(key);
-                }
-            } catch (error) {
-                console.warn('[Background Refresh]', key, error);
-            }
         }
 
         function syncLoginSchoolBrand() {
@@ -870,7 +910,6 @@
                     const result = await gasRequest('save', { key, data: current, deletedIds: [] });
                     if (result.data) applyServerData(result.data);
                     snapshotModule(key);
-                    dirtyModules.delete(key);
                     return true;
                 }
 
@@ -890,10 +929,7 @@
                     if (!newMap.has(id)) deletedIds.push(id);
                 });
 
-                if (!changed.length && !deletedIds.length) {
-                    dirtyModules.delete(key);
-                    return true;
-                }
+                if (!changed.length && !deletedIds.length) return true;
 
                 const result = await gasRequest('save', {
                     key,
@@ -903,18 +939,11 @@
 
                 if (result.data) applyServerData(result.data);
                 snapshotModule(key);
-                dirtyModules.delete(key);
-                Object.keys(moduleMemoryCache).forEach(cacheKey => {
-                    if (cacheKey.startsWith(key + '|')) delete moduleMemoryCache[cacheKey];
-                });
-                moduleLoadedSignatures[key] = '';
                 return true;
             } catch (error) {
-                // Pertahankan perubahan lokal ketika penyimpanan gagal.
-                // Jangan reload dari server karena response server bisa masih lama
-                // dan akan membuat pilihan status guru terlihat hilang.
                 console.error('[Secure Save]', error);
                 notifyError(error.message);
+                try { await loadModuleData(key, getActiveGlobalFilter(), true); } catch (e) {}
                 return false;
             }
         }
@@ -1218,39 +1247,7 @@
             }
         });
 
-        function openPengaturanSystem() {
-            const container = document.getElementById('moduleContentContainer');
-            if (!container) return;
-
-            currentActiveModule = 'pengaturan';
-            try { localStorage.setItem('siags_activeModule', 'pengaturan'); } catch (e) {}
-
-            document.querySelectorAll('.nav-item').forEach(el =>
-                el.classList.remove('bg-brand-600', 'text-white', 'shadow')
-            );
-            const nav = document.getElementById('nav-pengaturan');
-            if (nav) nav.classList.add('bg-brand-600', 'text-white', 'shadow');
-
-            try {
-                renderPengaturanView(container);
-            } catch (error) {
-                console.error('[Pengaturan Direct]', error);
-                container.innerHTML = `
-                    <div class="m-4 p-5 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700">
-                        <div class="font-bold text-sm mb-1">Gagal membuka Pengaturan Sistem</div>
-                        <div class="text-xs">${escapeHtml(error.message || 'Terjadi kesalahan.')}</div>
-                    </div>
-                `;
-            }
-        }
-
         async function switchModule(modKey) {
-            // Pengaturan Sistem adalah route sistem khusus.
-            if (modKey === 'pengaturan') {
-                openPengaturanSystem();
-                return;
-            }
-
             if (!isSidebarModuleEnabled(modKey)) {
                 if (modKey !== 'dashboard') notifyError('Menu ini sedang dinonaktifkan oleh Admin.');
                 modKey = 'dashboard';
@@ -1266,16 +1263,7 @@
             if (window.innerWidth < 1024 && !sidebar.classList.contains('-translate-x-full')) sidebar.classList.add('-translate-x-full');
 
             const container = document.getElementById('moduleContentContainer');
-            const currentFilters = modKey === 'rapor'
-                ? { ta: activeRaporTAFilter || '', kelas: activeRaporKelasFilter || '', mapel: '' }
-                : getActiveGlobalFilter();
-            const moduleSignature = makeModuleSignature(modKey, currentFilters);
-            const hasCache = !!moduleMemoryCache[moduleSignature] ||
-                moduleLoadedSignatures[modKey] === moduleSignature;
-
-            // Hanya tampilkan spinner pada first-load. Jika pernah dimuat,
-            // render dari memory cache terlebih dahulu agar perpindahan menu terasa instan.
-            if (container && !hasCache && modKey !== 'pengaturan') {
+            if (container) {
                 container.innerHTML = `
                     <div class="flex flex-col items-center justify-center py-20 text-slate-400">
                         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-brand-500 mb-3"></i>
@@ -1288,13 +1276,37 @@
             try {
                 // Pengaturan bukan DATA module. Ambil SETTINGS secara langsung agar tidak
                 // menunggu endpoint /module yang memang tidak memiliki modul "pengaturan".
-                const filter = currentFilters;
-                await ensureModuleData(modKey, filter, false);
-                renderModuleContent(modKey);
+                if (modKey === 'pengaturan') {
+                    // Admin: settings sudah tersedia dari bootstrap. Render langsung tanpa request tambahan.
+                    if (currentUser && currentUser.role === 'Admin Sistem') {
+                        renderPengaturanView(container);
+                        return;
+                    }
 
-                // Jika cache sudah ada, halaman tampil sekarang dan server disegarkan
-                // di belakang tanpa mengunci UI.
-                refreshModuleInBackground(modKey, filter);
+                    // Guru: tampilkan cache terlebih dahulu, lalu refresh di background dengan timeout.
+                    renderPengaturanView(container);
+                    if (currentUser && currentUser.role === 'Guru Mapel') {
+                        try {
+                            const result = await gasRequestWithTimeout('get_settings', {}, 8000);
+                            if (result && result.settings) {
+                                db.pengaturan = { ...(db.pengaturan || {}), ...result.settings };
+                                syncLoginSchoolBrand();
+                                updateHeaderUI();
+                                applySidebarConfig();
+                                renderPengaturanView(container);
+                            }
+                        } catch (refreshError) {
+                            console.warn('[Pengaturan] Refresh settings dilewati:', refreshError);
+                        }
+                    }
+                    return;
+                }
+
+                const filter = modKey === 'rapor'
+                    ? { ta: activeRaporTAFilter || '', kelas: activeRaporKelasFilter || '', mapel: '' }
+                    : getActiveGlobalFilter();
+                await ensureModuleData(modKey, filter, modKey === 'rapor');
+                renderModuleContent(modKey);
             } catch (error) {
                 console.error('[Lazy Module]', error);
                 if (container) {
@@ -2050,17 +2062,76 @@
             const container = document.getElementById('moduleContentContainer');
             const filter = getActiveGlobalFilter();
             const isSiswa = currentUser && currentUser.role === 'Siswa';
-            const siswaKelas = db.siswa.filter(s => (s.kelas === filter.kelas || !filter.kelas) && (s.ta === filter.ta || !filter.ta));
-            const records = db.absensi.filter(a => (!filter.mapel || a.mapel === filter.mapel) && (!filter.kelas || a.kelas === filter.kelas) && (!filter.ta || a.ta === filter.ta));
-            const uniqueDates = [...new Set(records.map(a => a.tanggal))].sort();
+
+            const siswaKelas = db.siswa.filter(s =>
+                (s.kelas === filter.kelas || !filter.kelas) &&
+                (s.ta === filter.ta || !filter.ta)
+            );
+
+            const records = db.absensi.filter(a =>
+                (!filter.mapel || a.mapel === filter.mapel) &&
+                (!filter.kelas || a.kelas === filter.kelas) &&
+                (!filter.ta || a.ta === filter.ta)
+            );
+
+            // Satu record per siswa + tanggal. Jika ada duplikat lama,
+            // record terakhir dianggap sebagai status yang benar.
+            const recordMap = new Map();
+            records.forEach(a => {
+                recordMap.set(`${a.siswaId}__${a.tanggal}`, a);
+            });
+
+            const uniqueDates = [...new Set(records.map(a => a.tanggal).filter(Boolean))].sort();
+
+            const getStudentStats = (siswa) => {
+                const studentRecords = [];
+                uniqueDates.forEach(date => {
+                    const rec = recordMap.get(`${siswa.id}__${date}`);
+                    if (rec) studentRecords.push(rec);
+                });
+
+                let totalHadir = 0;
+                let totalSakit = 0;
+                let totalIzin = 0;
+                let totalAlpa = 0;
+                let totalDispensasi = 0;
+
+                studentRecords.forEach(rec => {
+                    if (rec.status === 'Hadir') totalHadir++;
+                    else if (rec.status === 'Sakit') totalSakit++;
+                    else if (rec.status === 'Izin') totalIzin++;
+                    else if (rec.status === 'Alpa') totalAlpa++;
+                    else if (rec.status === 'Dispensasi') totalDispensasi++;
+                });
+
+                // Persentase dihitung dari SELURUH daftar kehadiran
+                // yang benar-benar tercatat untuk siswa tersebut.
+                const totalKehadiran = totalHadir + totalSakit + totalIzin + totalAlpa + totalDispensasi;
+                const persen = totalKehadiran > 0
+                    ? Math.round((totalHadir / totalKehadiran) * 100)
+                    : 0;
+
+                return {
+                    studentRecords,
+                    totalHadir,
+                    totalSakit,
+                    totalIzin,
+                    totalAlpa,
+                    totalDispensasi,
+                    totalKehadiran,
+                    persen
+                };
+            };
 
             let actionBtnHtml = '';
             if (isSiswa) {
-                actionBtnHtml = `<button onclick="previewRekapAbsensiPdf()" class="px-3 py-1.5 sm:px-4 sm:py-2 bg-brand-600 hover:bg-brand-700 text-white text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl transition shadow flex items-center gap-1.5 shrink-0"><i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">Preview PDF</span></button>`;
+                actionBtnHtml = `<button onclick="previewRekapAbsensiPdf()" class="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-bold rounded-xl transition shadow flex items-center gap-1.5 shrink-0"><i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">Preview PDF</span></button>`;
             } else {
                 actionBtnHtml = `
                     <div class="relative group shrink-0 z-50">
-                        <button class="px-3 py-1.5 sm:px-4 sm:py-2 bg-brand-600 hover:bg-brand-700 text-white text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl transition shadow flex items-center gap-1.5"><i class="fa-solid fa-download"></i> <span class="hidden sm:inline">Export Data</span> <i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i></button>
+                        <button class="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-[10px] sm:text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5">
+                            <i class="fa-solid fa-download"></i><span class="hidden sm:inline">Export Data</span><i class="fa-solid fa-chevron-down text-[10px] ml-0.5"></i>
+                        </button>
                         <div class="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 origin-top-right flex flex-col">
                             <button onclick="exportRekapAbsensiExcel()" class="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 border-b flex items-center gap-2.5 transition"><i class="fa-solid fa-file-excel text-emerald-600 w-4 text-center"></i> Export Excel</button>
                             <button onclick="previewRekapAbsensiPdf()" class="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 border-b flex items-center gap-2.5 transition"><i class="fa-solid fa-file-pdf text-rose-600 w-4 text-center"></i> Preview PDF</button>
@@ -2070,65 +2141,141 @@
                 `;
             }
 
+            const mobileCards = siswaKelas.length === 0
+                ? `<div class="p-6 text-center text-slate-400 text-xs">Tidak ada siswa</div>`
+                : siswaKelas.map((s, idx) => {
+                    const st = getStudentStats(s);
+                    const statusMap = new Map(st.studentRecords.map(r => [r.tanggal, r.status]));
+
+                    const dateItems = uniqueDates.length === 0
+                        ? `<div class="text-[10px] text-slate-400 italic">Belum ada data kehadiran.</div>`
+                        : uniqueDates.map(date => {
+                            const status = statusMap.get(date) || '-';
+                            const initial = status === 'Hadir' ? 'H'
+                                : status === 'Sakit' ? 'S'
+                                : status === 'Izin' ? 'I'
+                                : status === 'Alpa' ? 'A'
+                                : status === 'Dispensasi' ? 'D' : '-';
+
+                            const cls = status === 'Hadir' ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                : status === 'Sakit' ? 'text-blue-700 bg-blue-50 border-blue-200'
+                                : status === 'Izin' ? 'text-purple-700 bg-purple-50 border-purple-200'
+                                : status === 'Alpa' ? 'text-rose-700 bg-rose-50 border-rose-200'
+                                : status === 'Dispensasi' ? 'text-amber-700 bg-amber-50 border-amber-200'
+                                : 'text-slate-400 bg-slate-50 border-slate-200';
+
+                            const dt = new Date(`${date}T00:00:00`);
+                            const label = dt.toLocaleDateString('id-ID', {day:'2-digit', month:'2-digit'});
+                            return `<div class="absensi-mobile-date">${label}<div class="absensi-mobile-status ${cls}">${initial}</div></div>`;
+                        }).join('');
+
+                    return `
+                        <div class="absensi-mobile-card">
+                            <div class="absensi-mobile-card-head">
+                                <div class="min-w-0">
+                                    <div class="text-[10px] font-bold text-slate-400 mb-0.5">${idx + 1}</div>
+                                    <div class="font-bold text-sm text-slate-800 leading-snug break-words">${s.nama}</div>
+                                    <div class="text-[10px] text-slate-400 mt-1">${st.totalKehadiran} pertemuan tercatat</div>
+                                </div>
+                                <div class="shrink-0 text-right">
+                                    <div class="text-[9px] font-bold text-slate-400 uppercase">% Hadir</div>
+                                    <div class="text-xl font-extrabold ${st.persen < 75 ? 'text-rose-600' : 'text-emerald-600'}">${st.persen}%</div>
+                                </div>
+                            </div>
+                            <div class="absensi-mobile-stats">
+                                <div class="absensi-mobile-stat text-emerald-700 bg-emerald-50/70">H<br><span class="text-sm">${st.totalHadir}</span></div>
+                                <div class="absensi-mobile-stat text-blue-700 bg-blue-50/70">S<br><span class="text-sm">${st.totalSakit}</span></div>
+                                <div class="absensi-mobile-stat text-purple-700 bg-purple-50/70">I<br><span class="text-sm">${st.totalIzin}</span></div>
+                                <div class="absensi-mobile-stat text-rose-700 bg-rose-50/70">A<br><span class="text-sm">${st.totalAlpa}</span></div>
+                                <div class="absensi-mobile-stat text-amber-700 bg-amber-50/70">D<br><span class="text-sm">${st.totalDispensasi}</span></div>
+                            </div>
+                            <div class="absensi-mobile-dates">${dateItems}</div>
+                        </div>
+                    `;
+                }).join('');
+
+            const desktopRows = siswaKelas.length === 0
+                ? `<tr><td colspan="${uniqueDates.length + 8}" class="p-6 text-center text-slate-400">Tidak ada siswa</td></tr>`
+                : siswaKelas.map((s, idx) => {
+                    const st = getStudentStats(s);
+                    const statusMap = new Map(st.studentRecords.map(r => [r.tanggal, r.status]));
+
+                    const datesHtml = uniqueDates.length === 0
+                        ? `<td class="p-3 text-center text-slate-300">-</td>`
+                        : uniqueDates.map(date => {
+                            const status = statusMap.get(date) || '-';
+                            const initial = status === 'Hadir' ? 'H'
+                                : status === 'Sakit' ? 'S'
+                                : status === 'Izin' ? 'I'
+                                : status === 'Alpa' ? 'A'
+                                : status === 'Dispensasi' ? 'D' : '-';
+
+                            const style = status === 'Hadir' ? 'text-emerald-600 font-bold bg-emerald-50/30'
+                                : status === 'Sakit' ? 'text-blue-600 font-bold bg-blue-50/30'
+                                : status === 'Izin' ? 'text-purple-600 font-bold bg-purple-50/30'
+                                : status === 'Alpa' ? 'text-rose-600 font-bold bg-rose-50/30'
+                                : status === 'Dispensasi' ? 'text-amber-600 font-bold bg-amber-50/30'
+                                : 'text-slate-300';
+
+                            return `<td class="p-3 text-center border-r ${style}">${initial}</td>`;
+                        }).join('');
+
+                    return `
+                        <tr class="hover:bg-slate-50 transition group">
+                            <td class="p-3 sticky-col-1 text-slate-400 border-r">${idx + 1}</td>
+                            <td class="p-3 sticky-col-2 font-semibold text-slate-800 border-r">${s.nama}</td>
+                            ${datesHtml}
+                            <td class="p-3 text-center font-bold text-emerald-700 bg-emerald-50/80 border-l">${st.totalHadir}</td>
+                            <td class="p-3 text-center font-bold text-blue-700 bg-blue-50/80">${st.totalSakit}</td>
+                            <td class="p-3 text-center font-bold text-purple-700 bg-purple-50/80">${st.totalIzin}</td>
+                            <td class="p-3 text-center font-bold text-rose-700 bg-rose-50/80">${st.totalAlpa}</td>
+                            <td class="p-3 text-center font-bold text-amber-700 bg-amber-50/80">${st.totalDispensasi}</td>
+                            <td class="p-3 text-center font-bold ${st.persen < 75 ? 'text-rose-600' : 'text-brand-700'} sticky-pct">${st.persen}%</td>
+                        </tr>`;
+                }).join('');
+
             container.innerHTML = `
                 <div class="space-y-4 animate-fade-in">
                     <div class="w-full">${getLocalFilterHTML(actionBtnHtml)}</div>
-                    <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-1">
-                        <div class="space-y-1">
-                            <h2 class="font-bold text-base text-slate-800">Rekap Detail Absensi Per Pertemuan</h2>
-                            <p class="text-xs text-slate-400">Kelas: <span class="font-bold text-brand-600">${filter.mapel || 'Semua Mapel'} (${filter.kelas || 'Semua Kelas'})</span></p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            ${!isSiswa ? `<button onclick="renderModuleContent('absensi')" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition shadow flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i> Kembali</button>` : ''}
+
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <h2 class="font-bold text-base text-slate-800">Rekap Detail Absensi Per Pertemuan</h2>
+                                <p class="text-xs text-slate-400 mt-1">Kelas: <span class="font-bold text-brand-600">${filter.mapel || 'Semua Mapel'} (${filter.kelas || 'Semua Kelas'})</span></p>
+                            </div>
+                            ${!isSiswa ? `<button onclick="renderModuleContent('absensi')" class="w-full sm:w-auto px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition shadow flex items-center justify-center gap-1.5"><i class="fa-solid fa-arrow-left"></i> Kembali</button>` : ''}
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4">
-                        <div class="overflow-x-auto pb-2">
-                            <table class="w-full text-left border-collapse text-xs min-w-max relative">
+                    <!-- MOBILE: card summary + horizontal timeline -->
+                    <div class="absensi-mobile-list space-y-3 md:hidden">
+                        ${mobileCards}
+                    </div>
+
+                    <!-- DESKTOP/TABLET: wide table with safe sticky columns -->
+                    <div class="absensi-desktop-table bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-3">
+                        <div class="absensi-rekap-table-wrap">
+                            <table class="absensi-rekap-table w-full text-left text-xs">
                                 <thead>
                                     <tr class="bg-slate-100 text-slate-500 uppercase text-[10px] font-bold border-b border-t">
-                                        <th class="p-3 sticky-col-1 border-r">No</th><th class="p-3 sticky-col-2 border-r min-w-[150px]">Nama Siswa</th>
-                                        ${uniqueDates.length === 0 ? `<th class="p-3 text-center">Belum ada data</th>` : uniqueDates.map(date => `<th class="p-3 text-center border-r" title="${date}">${new Date(date).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</th>`).join('')}
-                                        <th class="p-3 text-center font-bold text-emerald-700 bg-emerald-50 border-l" title="Total Hadir">Tot H</th>
-                                        <th class="p-3 text-center font-bold text-blue-700 bg-blue-50" title="Total Sakit">Tot S</th>
-                                        <th class="p-3 text-center font-bold text-purple-700 bg-purple-50" title="Total Izin">Tot I</th>
-                                        <th class="p-3 text-center font-bold text-rose-700 bg-rose-50" title="Total Alpa">Tot A</th>
-                                        <th class="p-3 text-center font-bold text-amber-700 bg-amber-50" title="Total Dispensasi">Tot D</th>
-                                        <th class="p-3 text-center font-bold text-brand-700 bg-brand-50 sticky right-0 z-10 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">% Hadir</th>
+                                        <th class="p-3 sticky-col-1 border-r">No</th>
+                                        <th class="p-3 sticky-col-2 border-r">Nama Siswa</th>
+                                        ${uniqueDates.length === 0
+                                            ? `<th class="p-3 text-center">Belum ada data</th>`
+                                            : uniqueDates.map(date => {
+                                                const dt = new Date(`${date}T00:00:00`);
+                                                return `<th class="p-3 text-center border-r min-w-[62px]" title="${date}">${dt.toLocaleDateString('id-ID', {day:'2-digit', month:'2-digit'})}</th>`;
+                                            }).join('')}
+                                        <th class="p-3 text-center font-bold text-emerald-700 bg-emerald-50 border-l min-w-[60px]">H</th>
+                                        <th class="p-3 text-center font-bold text-blue-700 bg-blue-50 min-w-[60px]">S</th>
+                                        <th class="p-3 text-center font-bold text-purple-700 bg-purple-50 min-w-[60px]">I</th>
+                                        <th class="p-3 text-center font-bold text-rose-700 bg-rose-50 min-w-[60px]">A</th>
+                                        <th class="p-3 text-center font-bold text-amber-700 bg-amber-50 min-w-[60px]">D</th>
+                                        <th class="p-3 text-center font-bold text-brand-700 bg-brand-50 sticky-pct">% Hadir</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    ${siswaKelas.length === 0 ? `<tr><td colspan="${uniqueDates.length + 8}" class="p-6 text-center text-slate-400">Tidak ada siswa</td></tr>` :
-                                    siswaKelas.map((s, idx) => {
-                                        let totalHadir = 0, totalSakit = 0, totalIzin = 0, totalAlpa = 0, totalDispensasi = 0;
-                                        const datesHtml = uniqueDates.length === 0 ? `<td class="p-3 text-center">-</td>` : uniqueDates.map(date => {
-                                            const rec = records.find(a => a.siswaId === s.id && a.tanggal === date);
-                                            const status = rec ? rec.status : '-';
-                                            let initial = '-', style = 'text-slate-300';
-                                            if (status === 'Hadir') { initial = 'H'; style = 'text-emerald-600 font-bold bg-emerald-50/30'; totalHadir++; }
-                                            else if (status === 'Sakit') { initial = 'S'; style = 'text-blue-600 font-bold bg-blue-50/30'; totalSakit++; }
-                                            else if (status === 'Izin') { initial = 'I'; style = 'text-purple-600 font-bold bg-purple-50/30'; totalIzin++; }
-                                            else if (status === 'Alpa') { initial = 'A'; style = 'text-rose-600 font-bold bg-rose-50/30'; totalAlpa++; }
-                                            else if (status === 'Dispensasi') { initial = 'D'; style = 'text-amber-600 font-bold bg-amber-50/30'; totalDispensasi++; }
-                                            return `<td class="p-3 text-center border-r ${style}">${initial}</td>`;
-                                        }).join('');
-                                        const persen = uniqueDates.length === 0 ? 100 : Math.round((totalHadir / uniqueDates.length) * 100);
-
-                                        return `
-                                        <tr class="hover:bg-slate-50 transition group">
-                                            <td class="p-3 sticky-col-1 group-hover:bg-slate-50 text-slate-400 border-r">${idx + 1}</td>
-                                            <td class="p-3 sticky-col-2 group-hover:bg-slate-50 font-semibold text-slate-800 border-r">${s.nama}</td>
-                                            ${datesHtml}
-                                            <td class="p-3 text-center font-bold text-emerald-700 bg-emerald-50/80 border-l">${totalHadir}</td>
-                                            <td class="p-3 text-center font-bold text-blue-700 bg-blue-50/80">${totalSakit}</td>
-                                            <td class="p-3 text-center font-bold text-purple-700 bg-purple-50/80">${totalIzin}</td>
-                                            <td class="p-3 text-center font-bold text-rose-700 bg-rose-50/80">${totalAlpa}</td>
-                                            <td class="p-3 text-center font-bold text-amber-700 bg-amber-50/80">${totalDispensasi}</td>
-                                            <td class="p-3 text-center font-bold ${persen < 75 ? 'text-rose-600' : 'text-brand-700'} bg-brand-50/80 sticky right-0 shadow-[-4px_0_6px_-1px_rgba(0,0,0,0.05)]">${persen}%</td>
-                                        </tr>`;
-                                    }).join('')}
-                                </tbody>
+                                <tbody class="divide-y divide-slate-100">${desktopRows}</tbody>
                             </table>
                         </div>
                     </div>
@@ -2148,69 +2295,25 @@
             }
         }
 
-        function markModuleDirty(key) {
-            dirtyModules.add(key);
-        }
-
-        function createLocalRecordId(prefix = 'R') {
-            try {
-                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-                    return prefix + window.crypto.randomUUID();
-                }
-            } catch (e) {}
-            return prefix + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
-        }
-
         function setAbsenStatus(siswaId, status, btnElement) {
             const filter = getActiveGlobalFilter();
-            const same = a => String(a.siswaId) === String(siswaId)
-                && String(a.tanggal) === String(selectedAbsensiDate)
-                && String(a.mapel || '') === String(filter.mapel || '')
-                && String(a.kelas || '') === String(filter.kelas || '')
-                && String(a.ta || '') === String(filter.ta || '');
-            const idx = db.absensi.findIndex(same);
-
-            if (idx !== -1) {
-                db.absensi[idx].status = status;
-            } else {
-                db.absensi.push({
-                    id: createLocalRecordId('A'),
-                    tanggal: selectedAbsensiDate,
-                    siswaId,
-                    mapel: filter.mapel || '',
-                    kelas: filter.kelas || '',
-                    ta: filter.ta || '',
-                    status
-                });
-            }
-
-            // Tandai dirty SEBELUM ada request background yang dapat selesai.
-            // Dengan ini pilihan H/S/I/A/D tidak akan ditimpa data lama dari server.
-            markModuleDirty('absensi');
-
+            const idx = db.absensi.findIndex(a => a.siswaId === siswaId && a.tanggal === selectedAbsensiDate && a.mapel === filter.mapel);
+            if (idx !== -1) db.absensi[idx].status = status;
+            else db.absensi.push({ id: 'A' + Date.now(), tanggal: selectedAbsensiDate, siswaId, mapel: filter.mapel, kelas: filter.kelas, ta: filter.ta, status });
+            
             if (btnElement) {
                 const rowButtons = btnElement.parentElement.querySelectorAll('button');
                 rowButtons.forEach(b => b.className = 'px-2 py-0.5 text-[10px] font-bold rounded-lg transition text-slate-500 hover:text-slate-800');
                 btnElement.className = `px-2 py-0.5 text-[10px] font-bold rounded-lg transition ${getStatusBadgeClass(status)}`;
             } else {
-                renderModuleContent('absensi');
+                renderModuleContent('absensi'); 
             }
         }
 
-        async function saveAbsensiManual() {
-            const saveBtn = document.querySelector('button[onclick="saveAbsensiManual()"]');
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...';
-            }
-
-            const ok = await saveDb('absensi');
-            if (saveBtn) saveBtn.disabled = false;
-
-            if (ok) {
-                notifySuccess('Data absensi harian berhasil disimpan!');
-                renderModuleContent('absensi');
-            }
+        function saveAbsensiManual() {
+            saveDb('absensi');
+            notifySuccess('Data absensi harian berhasil disimpan!');
+            renderModuleContent('absensi');
         }
 
         // --- BUG FIX: QR CAMERA TIDAK TERTUTUP ---
@@ -2322,7 +2425,8 @@
                     row[new Date(date).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })] = initial;
                 });
                 row['Tot H'] = totalH; row['Tot S'] = totalS; row['Tot I'] = totalI; row['Tot A'] = totalA; row['Tot D'] = totalD;
-                row['% Hadir'] = (uniqueDates.length === 0 ? 100 : Math.round((totalH / uniqueDates.length) * 100)) + '%';
+                const totalAttendance = totalH + totalS + totalI + totalA + totalD;
+                row['% Hadir'] = (totalAttendance === 0 ? 0 : Math.round((totalH / totalAttendance) * 100)) + '%';
                 return row;
             });
             const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Rekap_Detail"); XLSX.writeFile(wb, `Rekap_Detail_Absensi_${filter.mapel || 'Semua'}.xlsx`);
@@ -2355,7 +2459,8 @@
                         else if (status === 'Dispensasi') { initial = 'D'; textColor = 'text-amber-600 font-bold'; totalD++; }
                         rowHtml += `<td class="border p-1 text-center ${textColor}">${initial}</td>`;
                     });
-                    const persen = uniqueDates.length === 0 ? 100 : Math.round((totalH / uniqueDates.length) * 100);
+                    const totalAttendance = totalH + totalS + totalI + totalA + totalD;
+                    const persen = totalAttendance === 0 ? 0 : Math.round((totalH / totalAttendance) * 100);
                     rowHtml += `<td class="border p-1 text-center font-bold text-emerald-700">${totalH}</td><td class="border p-1 text-center font-bold text-blue-700">${totalS}</td><td class="border p-1 text-center font-bold text-purple-700">${totalI}</td><td class="border p-1 text-center font-bold text-rose-700">${totalA}</td><td class="border p-1 text-center font-bold text-amber-700">${totalD}</td><td class="border p-1 text-center font-bold text-brand-700">${persen}%</td></tr>`;
                     return rowHtml;
                 }).join('');
@@ -3688,10 +3793,8 @@
             });
         }
         
-        function renderPengaturanView(container) {
-            // Jangan melakukan request async di sini.
-            // Data SETTINGS sudah tersedia dari bootstrap/cache.
-            // Sinkronisasi terbaru untuk Guru dilakukan terpisah oleh switchModule().
+        async function renderPengaturanView(container) {
+            await refreshGlobalSettingsForCurrentUser();
             if (currentUser && currentUser.role === 'Siswa') {
                 const avatarUrl = currentUser.foto || 'https://placehold.co/150x150/eff6ff/1d4ed8?text=' + currentUser.nama.charAt(0);
                 container.innerHTML = `
@@ -4060,7 +4163,6 @@
         }
 
         function isSidebarModuleEnabled(modKey) {
-            if (modKey === 'pengaturan') return !!currentUser;
             if (!currentUser || currentUser.role === 'Admin Sistem') return true;
             const role = currentUser.role === 'Siswa' ? 'siswa' : 'guru';
             const cfg = getSidebarConfig();

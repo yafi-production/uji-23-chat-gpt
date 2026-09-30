@@ -2100,13 +2100,16 @@
 
             const getStudentStats = (siswa) => {
                 const studentRecords = [];
-                uniqueDates.forEach(date => {
-                    const rec = recordMap.get(`${siswa.id}__${date}`);
-                    if (rec) {
-                        const normalizedStatus = getAttendanceRecordStatus(rec);
-                        if (normalizedStatus) studentRecords.push({ ...rec, normalizedStatus });
-                    }
+                const studentDateMap = new Map();
+                records.forEach(rec => {
+                    if (String(rec.siswaId) !== String(siswa.id)) return;
+                    const normalizedStatus = getAttendanceRecordStatus(rec);
+                    const date = String(rec.tanggal || '').trim();
+                    if (!date || !normalizedStatus) return;
+                    // Gunakan record terakhir pada tanggal yang sama.
+                    studentDateMap.set(date, { ...rec, normalizedStatus });
                 });
+                studentDateMap.forEach(rec => studentRecords.push(rec));
 
                 let totalHadir = 0;
                 let totalSakit = 0;
